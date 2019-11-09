@@ -1,5 +1,6 @@
 
-local dversion = 153
+local dversion = 161
+
 local major, minor = "DetailsFramework-1.0", dversion
 local DF, oldminor = LibStub:NewLibrary (major, minor)
 
@@ -21,7 +22,7 @@ SMALL_NUMBER = 0.000001
 ALPHA_BLEND_AMOUNT = 0.8400251
 
 DF.AuthorInfo = {
-	Name = "Tercioo",
+	Name = "Terciob",
 	Discord = "https://discord.gg/AGSzAZX",
 }
 
@@ -1654,6 +1655,7 @@ DF.GlobalWidgetControlNames = {
 	slider = "DF_SliderMetaFunctions",
 	split_bar = "DF_SplitBarMetaFunctions",
 	aura_tracker = "DF_AuraTracker",
+	healthBar = "DF_healthBarMetaFunctions",
 }
 
 function DF:AddMemberForWidget (widgetName, memberType, memberName, func)
