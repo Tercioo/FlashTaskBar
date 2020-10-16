@@ -22,13 +22,32 @@ do
 	local metaPrototype = {
 		WidgetType = "slider",
 		SetHook = DF.SetHook,
+		HasHook = DF.HasHook,
+		ClearHooks = DF.ClearHooks,
 		RunHooksForWidget = DF.RunHooksForWidget,
+		
+		dversion = DF.dversion
 	}
 
-	_G [DF.GlobalWidgetControlNames ["slider"]] = _G [DF.GlobalWidgetControlNames ["slider"]] or metaPrototype
+	--check if there's a metaPrototype already existing
+	if (_G[DF.GlobalWidgetControlNames["slider"]]) then
+		--get the already existing metaPrototype
+		local oldMetaPrototype = _G[DF.GlobalWidgetControlNames ["slider"]]
+		--check if is older
+		if ( (not oldMetaPrototype.dversion) or (oldMetaPrototype.dversion < DF.dversion) ) then
+			--the version is older them the currently loading one
+			--copy the new values into the old metatable
+			for funcName, _ in pairs(metaPrototype) do
+				oldMetaPrototype[funcName] = metaPrototype[funcName]
+			end
+		end
+	else
+		--first time loading the framework
+		_G[DF.GlobalWidgetControlNames ["slider"]] = metaPrototype
+	end
 end
 
-local DFSliderMetaFunctions = _G [DF.GlobalWidgetControlNames ["slider"]]
+local DFSliderMetaFunctions = _G[DF.GlobalWidgetControlNames ["slider"]]
 
 ------------------------------------------------------------------------------------------------------------
 --> metatables
@@ -228,6 +247,18 @@ local DFSliderMetaFunctions = _G [DF.GlobalWidgetControlNames ["slider"]]
 		return self.thumb:SetSize (w, h)
 	end	
 	
+	function DFSliderMetaFunctions:SetBackdrop(...)
+			return self.slider:SetBackdrop(...)
+	end
+
+	function DFSliderMetaFunctions:SetBackdropColor(...)
+		return self.slider:SetBackdropColor(...)
+	end
+
+	function DFSliderMetaFunctions:SetBackdropBorderColor(...)
+		return self.slider:SetBackdropBorderColor(...)
+	end
+
 	
 -- setpoint
 	function DFSliderMetaFunctions:SetPoint (v1, v2, v3, v4, v5)
@@ -405,7 +436,7 @@ local DFSliderMetaFunctions = _G [DF.GlobalWidgetControlNames ["slider"]]
 	end
 	
 
-	local f = CreateFrame ("frame", "DetailsFrameworkSliderButtons1", UIParent)
+	local f = CreateFrame ("frame", "DetailsFrameworkSliderButtons1", UIParent, "BackdropTemplate")
 	f:Hide()
 	f:SetHeight (18)
 	
@@ -421,6 +452,7 @@ local DFSliderMetaFunctions = _G [DF.GlobalWidgetControlNames ["slider"]]
 	end
 	
 	function f:ShowMe (host)
+		f:SetParent(host)
 		f:SetPoint ("bottomleft", host, "topleft", -3, -5)
 		f:SetPoint ("bottomright", host, "topright", 3, -5)
 		--f:SetFrameStrata (host:GetFrameStrata())
@@ -441,8 +473,8 @@ local DFSliderMetaFunctions = _G [DF.GlobalWidgetControlNames ["slider"]]
 		f:SetScript ("OnUpdate", going_hide)
 	end
 	
-	local button_plus = CreateFrame ("button", "DetailsFrameworkSliderButtonsPlusButton", f)
-	local button_minor = CreateFrame ("button", "DetailsFrameworkSliderButtonsMinorButton", f)
+	local button_plus = CreateFrame ("button", "DetailsFrameworkSliderButtonsPlusButton", f, "BackdropTemplate")
+	local button_minor = CreateFrame ("button", "DetailsFrameworkSliderButtonsMinorButton", f, "BackdropTemplate")
 	button_plus:SetFrameStrata (f:GetFrameStrata())
 	button_minor:SetFrameStrata (f:GetFrameStrata())
 	
@@ -618,7 +650,7 @@ local DFSliderMetaFunctions = _G [DF.GlobalWidgetControlNames ["slider"]]
 		
 			if (not DFSliderMetaFunctions.editbox_typevalue) then
 			
-				local editbox = CreateFrame ("EditBox", "DetailsFrameworkSliderEditBox", UIParent)
+				local editbox = CreateFrame ("EditBox", "DetailsFrameworkSliderEditBox", UIParent, "BackdropTemplate")
 				
 				editbox:SetSize (40, 20)
 				editbox:SetJustifyH ("center")
@@ -901,6 +933,7 @@ local set_switch_func = function (self, newFunction)
 end
 
 local set_as_checkbok = function (self)
+	if self.is_checkbox and self.checked_texture then return end
 	local checked = self:CreateTexture (self:GetName() .. "CheckTexture", "overlay")
 	checked:SetTexture ([[Interface\Buttons\UI-CheckBox-Check]])
 	checked:SetPoint ("center", self.button, "center", -1, -1)
@@ -1139,7 +1172,7 @@ function DF:NewSlider (parent, container, name, member, w, h, min, max, step, de
 		SliderObject.lockdown = false
 		SliderObject.container = container
 		
-	SliderObject.slider = CreateFrame ("slider", name, parent)
+	SliderObject.slider = CreateFrame ("slider", name, parent,"BackdropTemplate")
 	SliderObject.widget = SliderObject.slider
 
 	SliderObject.useDecimals = isDecemal or false
@@ -1177,6 +1210,8 @@ function DF:NewSlider (parent, container, name, member, w, h, min, max, step, de
 	SliderObject.thumb = SliderObject.slider:CreateTexture (nil, "artwork")
 	SliderObject.thumb:SetTexture ("Interface\\Buttons\\UI-ScrollBar-Knob")
 	SliderObject.thumb:SetSize (30+(h*0.2), h*1.2)
+	SliderObject.thumb.originalWidth = SliderObject.thumb:GetWidth()
+	SliderObject.thumb.originalHeight =SliderObject.thumb:GetHeight()
 	SliderObject.thumb:SetAlpha (0.7)
 	SliderObject.slider:SetThumbTexture (SliderObject.thumb)
 	SliderObject.slider.thumb = SliderObject.thumb

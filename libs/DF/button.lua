@@ -21,13 +21,32 @@ do
 	local metaPrototype = {
 		WidgetType = "button",
 		SetHook = DF.SetHook,
+		HasHook = DF.HasHook,
+		ClearHooks = DF.ClearHooks,
 		RunHooksForWidget = DF.RunHooksForWidget,
+
+		dversion = DF.dversion
 	}
 
-	_G [DF.GlobalWidgetControlNames ["button"]] = _G [DF.GlobalWidgetControlNames ["button"]] or metaPrototype
+	--check if there's a metaPrototype already existing
+	if (_G[DF.GlobalWidgetControlNames["button"]]) then
+		--get the already existing metaPrototype
+		local oldMetaPrototype = _G[DF.GlobalWidgetControlNames ["button"]]
+		--check if is older
+		if ( (not oldMetaPrototype.dversion) or (oldMetaPrototype.dversion < DF.dversion) ) then
+			--the version is older them the currently loading one
+			--copy the new values into the old metatable
+			for funcName, _ in pairs(metaPrototype) do
+				oldMetaPrototype[funcName] = metaPrototype[funcName]
+			end
+		end
+	else
+		--first time loading the framework
+		_G[DF.GlobalWidgetControlNames ["button"]] = metaPrototype
+	end
 end
 
-local ButtonMetaFunctions = _G [DF.GlobalWidgetControlNames ["button"]]
+local ButtonMetaFunctions = _G[DF.GlobalWidgetControlNames ["button"]]
 
 ------------------------------------------------------------------------------------------------------------
 --> metatables
@@ -409,6 +428,18 @@ local ButtonMetaFunctions = _G [DF.GlobalWidgetControlNames ["button"]]
 		if (self.icon) then
 			return self.icon:GetTexture()
 		end
+	end
+
+	function ButtonMetaFunctions:SetBackdrop(...)
+		return self.button:SetBackdrop(...)
+	end
+
+	function ButtonMetaFunctions:SetBackdropColor(...)
+		return self.button:SetBackdropColor(...)
+	end
+
+	function ButtonMetaFunctions:SetBackdropBorderColor(...)
+		return self.button:SetBackdropBorderColor(...)
 	end
 	
 	function ButtonMetaFunctions:SetIcon (texture, width, height, layout, texcoord, overlay, textdistance, leftpadding, textheight, short_method)
@@ -1034,7 +1065,7 @@ function DF:NewButton (parent, container, name, member, w, h, func, param1, para
 		ButtonObject.container = container
 		ButtonObject.options = {OnGrab = false}
 
-	ButtonObject.button = CreateFrame ("button", name, parent)
+	ButtonObject.button = CreateFrame ("button", name, parent,"BackdropTemplate")
 	DF:Mixin (ButtonObject.button, DF.WidgetFunctions)
 	
 	build_button (ButtonObject.button)
