@@ -272,7 +272,7 @@ function DF:CreateCoolTip()
 		--> main frame
 		local frame1
 		if (not GameCooltipFrame1) then
-			frame1 = CreateFrame ("Frame", "GameCooltipFrame1", UIParent)
+			frame1 = CreateFrame ("Frame", "GameCooltipFrame1", UIParent,"TooltipBackdropTemplate")
 			
 			tinsert (UISpecialFrames, "GameCooltipFrame1")
 			DF:CreateFlashAnimation (frame1)
@@ -299,7 +299,7 @@ function DF:CreateCoolTip()
 		--> secondary frame
 		local frame2
 		if (not GameCooltipFrame2) then
-			frame2 = CreateFrame ("Frame", "GameCooltipFrame2", UIParent)
+			frame2 = CreateFrame ("Frame", "GameCooltipFrame2", UIParent,"TooltipBackdropTemplate")
 			
 			tinsert (UISpecialFrames, "GameCooltipFrame2")
 			DF:CreateFlashAnimation (frame2)
@@ -1621,7 +1621,7 @@ function DF:CreateCoolTip()
 			
 			--> height
 			if (CoolTip.OptionsTable.AlignAsBlizzTooltip) then
-				local height = _math_max (8, menuButton.leftText:GetStringHeight(), menuButton.rightText:GetStringHeight(), menuButton.leftIcon:GetHeight(), menuButton.rightIcon:GetHeight())
+				local height = _math_max (2, menuButton.leftText:GetStringHeight(), menuButton.rightText:GetStringHeight(), menuButton.leftIcon:GetHeight(), menuButton.rightIcon:GetHeight(), CoolTip.OptionsTable.AlignAsBlizzTooltipForceHeight or 2)
 				menuButton:SetHeight (height)
 				menuButton:SetPoint ("top", frame1, "top", 0, temp)
 				temp = temp + ( height * -1)
