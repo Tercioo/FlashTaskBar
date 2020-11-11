@@ -585,10 +585,44 @@ function FlashTaskBar.OnInit (self)
 		--/dump C_VignetteInfo.GetVignetteInfo (C_VignetteInfo.GetVignettes()[1])
 		--/dump C_VignetteInfo.GetVignettes()
 
-		for index, GUID in ipairs (C_VignetteInfo.GetVignettes()) do
-			local vignetteInfo = C_VignetteInfo.GetVignetteInfo (GUID)
-			if (vignetteInfo and vignetteInfo.onMinimap and not vignetteInfo.isDead and vignetteInfo.atlasName == "VignetteKill") then --vignetteID == 2004
+		--track special events
+		--[=[]]
+			for i, vignetteID in ipairs (C_VignetteInfo.GetVignettes()) do
+				local vignetteInfo = C_VignetteInfo.GetVignetteInfo (vignetteID)
 				
+				if (vignetteInfo) then
+					local serial = vignetteInfo.objectGUID
+		
+					if (serial) then
+						local name = vignetteInfo.name
+						local objectIcon = vignetteInfo.atlasName
+						
+						--naga event
+						if (objectIcon == "nazjatar-nagaevent") then
+							WorldQuestTracker.NagaEventCooldown = WorldQuestTracker.NagaEventCooldown or 0
+							if (WorldQuestTracker.NagaEventCooldown < time()) then
+								WorldQuestTracker:Msg("a naga event is happening, open the map for location.|r")
+								WorldQuestTracker.NagaEventCooldown = time() + 360 --6min
+							end
+						end
+					end
+				end
+			end
+		--]=]
+		-----------------------
+
+		for _, vignetteID in ipairs (C_VignetteInfo.GetVignettes()) do
+			local vignetteInfo = C_VignetteInfo.GetVignetteInfo (vignetteID)
+
+			--special event on icecrown map 9.0.1 event
+			if (vignetteInfo and C_Map.GetBestMapForUnit ("player") == 118) then
+				local objectIcon = vignetteInfo.atlasName
+				if (objectIcon == "nazjatar-nagaevent") then
+					FlashTaskBar:DoFlash ("rare_scan")
+				end
+			end
+
+			if (vignetteInfo and vignetteInfo.onMinimap and not vignetteInfo.isDead and vignetteInfo.atlasName == "VignetteKill") then --vignetteID == 2004
 				local objectGUID = vignetteInfo.objectGUID
 				if (FlashTaskBar.db.profile.any_rare) then
 					if (not UnitOnTaxi ("player")) then
@@ -599,11 +633,11 @@ function FlashTaskBar.OnInit (self)
 					end
 				
 				elseif (vignetteInfo.name) then
-					for _, npc_name in ipairs (FlashTaskBar.db.profile.rare_names) do
-						npc_name = lower (npc_name)
-						name = lower (name)
-						if (npc_name == name) then
-							if (not FlashTaskBar.RareFlashCooldown [objectGUID] or FlashTaskBar.RareFlashCooldown [objectGUID] < time()) then
+					for _, npcName in ipairs(FlashTaskBar.db.profile.rare_names) do
+						npcName = lower(npcName)
+						local vignetteName = lower(vignetteInfo.name)
+						if (npcName == vignetteName) then
+							if (not FlashTaskBar.RareFlashCooldown[objectGUID] or FlashTaskBar.RareFlashCooldown[objectGUID] < time()) then
 								FlashTaskBar:DoFlash ("rare_scan")
 								FlashTaskBar.RareFlashCooldown [objectGUID] = time() + 180
 							end
@@ -822,7 +856,7 @@ function FlashTaskBar.OnInit (self)
 				if (FlashTaskBar.db.profile.on_chat_player_name) then
 					FlashTaskBar:EnableChatScan()
 				else
-					--ver se tem alguma outra função usando o chat scan
+					--ver se tem alguma outra funï¿½ï¿½o usando o chat scan
 					if (not FlashTaskBar.db.profile.chat_scan) then
 						FlashTaskBar:DisableChatScan()
 					end
@@ -955,7 +989,7 @@ function FlashTaskBar.OnInit (self)
 		if (value) then
 			FlashTaskBar:EnableChatScan()
 		else
-			--ver se tem alguma outra função usando o chat scan
+			--ver se tem alguma outra funï¿½ï¿½o usando o chat scan
 			if (not FlashTaskBar.db.profile.on_chat_player_name) then
 				FlashTaskBar:DisableChatScan()
 			end
@@ -1006,7 +1040,7 @@ function FlashTaskBar.OnInit (self)
 	button_keyword_remove:SetPoint ("left", dropdown_keyword_remove, "right", 2, 0)
 	label_keyword_remove:SetPoint ("topleft", FlashTaskBar.OptionsFrame1, "topleft", 10, y_chat_scan-60)
 	
-	--ativar o chat scan se necessário
+	--ativar o chat scan se necessï¿½rio
 	if (FlashTaskBar.db.profile.chat_scan or FlashTaskBar.db.profile.on_chat_player_name) then
 		FlashTaskBar:EnableChatScan()
 	end
