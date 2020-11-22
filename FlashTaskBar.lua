@@ -208,13 +208,6 @@ function FlashTaskBar.OnInit (self)
 		end
 	end)
 	
-	--game master
-	hooksecurefunc ("HelpFrame_OnEvent", function (self, token)
-		if (token == "GMRESPONSE_RECEIVED") then
-			FlashTaskBar:DoFlash("gm_response")
-		end
-	end)
-	
 	--general alerts
 	hooksecurefunc ("StaticPopup_Show", function (token, text_arg1, text_arg2, data, insertedFrame)
 		if (token == "BFMGR_INVITED_TO_ENTER") then --> generic world pvp alert
