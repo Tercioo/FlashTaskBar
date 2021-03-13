@@ -1,6 +1,6 @@
 
 
-local dversion = 218
+local dversion = 236
 
 local major, minor = "DetailsFramework-1.0", dversion
 local DF, oldminor = LibStub:NewLibrary (major, minor)
@@ -486,6 +486,7 @@ function DF:GroupIterator (func, ...)
 		for i = 1, GetNumGroupMembers() - 1 do
 			DF:QuickDispatch (func, "party" .. i, ...)
 		end
+		DF:QuickDispatch (func, "player", ...)
 	
 	else
 		DF:QuickDispatch (func, "player", ...)
@@ -2374,6 +2375,7 @@ DF.GlobalWidgetControlNames = {
 	split_bar = "DF_SplitBarMetaFunctions",
 	aura_tracker = "DF_AuraTracker",
 	healthBar = "DF_healthBarMetaFunctions",
+	timebar = "DF_TimeBarMetaFunctions",
 }
 
 function DF:AddMemberForWidget (widgetName, memberType, memberName, func)
@@ -2407,6 +2409,16 @@ end
 -----------------------------
 
 function DF:OpenInterfaceProfile()
+	-- OptionsFrame1/2 should be registered if created with DF:CreateAddOn, so open to them directly
+	if self.OptionsFrame1 then
+		InterfaceOptionsFrame_OpenToCategory (self.OptionsFrame1)
+		if self.OptionsFrame2 then
+			InterfaceOptionsFrame_OpenToCategory (self.OptionsFrame2)
+		end
+		return
+	end
+	
+	-- fallback (broken as of ElvUI Skins in version 12.18+... maybe fix/change will come)
 	InterfaceOptionsFrame_OpenToCategory (self.__name)
 	InterfaceOptionsFrame_OpenToCategory (self.__name)
 	for i = 1, 100 do
@@ -3399,13 +3411,13 @@ function DF:CoreDispatch (context, func, ...)
 		error (errortext)
 	end
 	
-	local okay, result1, result2, result3, result4 = pcall (func, ...)
-	
-	if (not okay) then
-		local stack = debugstack(2)
-		local errortext = "D!Framework (" .. context .. ") error: " .. result1 .. "\n====================\n" .. stack .. "\n====================\n"
-		error (errortext)
-	end
+	local okay, result1, result2, result3, result4 = xpcall(func, geterrorhandler(), ...)
+
+	--if (not okay) then --when using pcall
+		--local stack = debugstack(2)
+		--local errortext = "D!Framework (" .. context .. ") error: " .. result1 .. "\n====================\n" .. stack .. "\n====================\n"
+		--error (errortext)
+	--end
 	
 	return result1, result2, result3, result4
 end
@@ -3509,6 +3521,30 @@ DF.AlliedRaceList = {
 	[41] = "MagharOrc",
 }
 
+local slotIdToIcon = {
+	[1] = "Interface\\ICONS\\" .. "INV_Helmet_29", --head
+	[2] = "Interface\\ICONS\\" .. "INV_Jewelry_Necklace_07", --neck
+	[3] = "Interface\\ICONS\\" .. "INV_Shoulder_25", --shoulder
+	[5] = "Interface\\ICONS\\" .. "INV_Chest_Cloth_08", --chest
+	[6] = "Interface\\ICONS\\" .. "INV_Belt_15", --waist
+	[7] = "Interface\\ICONS\\" .. "INV_Pants_08", --legs
+	[8] = "Interface\\ICONS\\" .. "INV_Boots_Cloth_03", --feet
+	[9] = "Interface\\ICONS\\" .. "INV_Bracer_07", --wrist
+	[10] = "Interface\\ICONS\\" .. "INV_Gauntlets_17", --hands
+	[11] = "Interface\\ICONS\\" .. "INV_Jewelry_Ring_22", --finger 1
+	[12] = "Interface\\ICONS\\" .. "INV_Jewelry_Ring_22", --finger 2
+	[13] = "Interface\\ICONS\\" .. "INV_Jewelry_Talisman_07", --trinket 1
+	[14] = "Interface\\ICONS\\" .. "INV_Jewelry_Talisman_07", --trinket 2
+	[15] = "Interface\\ICONS\\" .. "INV_Misc_Cape_19", --back
+	[16] = "Interface\\ICONS\\" .. "INV_Sword_39", --main hand
+	[17] = "Interface\\ICONS\\" .. "INV_Sword_39", --off hand
+}
+
+function DF:GetArmorIconByArmorSlot(equipSlotId)
+	return slotIdToIcon[equipSlotId] or ""
+end
+
+
 --> store and return a list of character races, always return the non-localized value
 DF.RaceCache = {}
 function DF:GetCharacterRaceList (fullList)
@@ -3524,7 +3560,7 @@ function DF:GetCharacterRaceList (fullList)
 		
 		local alliedRaceInfo = C_AlliedRaces.GetRaceInfoByID (i)
 		if (alliedRaceInfo and DF.AlliedRaceList [alliedRaceInfo.raceID]) then
-			tinsert (DF.RaceCache, {Name = alliedRaceInfo.name, FileString = alliedRaceInfo.raceFileString})
+			tinsert (DF.RaceCache, {Name = alliedRaceInfo.maleName, FileString = alliedRaceInfo.raceFileString})
 		end
 	end
 	
@@ -3611,6 +3647,28 @@ DF.RoleTypes = {
 }
 function DF:GetRoleTypes()
 	return DF.RoleTypes
+end
+
+local roleTexcoord = {
+	DAMAGER = "72:130:69:127",
+	HEALER = "72:130:2:60",
+	TANK = "5:63:69:127",
+	NONE = "139:196:69:127",
+}
+
+function DF:AddRoleIconToText(text, role, size)
+	if (role and type(role) == "string") then
+		local coords = GetTexCoordsForRole(role)
+		if (coords) then
+			if (type (text) == "string" and role ~= "NONE") then
+				size = size or 14
+				text = "|TInterface\\LFGFRAME\\UI-LFG-ICON-ROLES:" .. size .. ":" .. size .. ":0:0:256:256:" .. roleTexcoord[role] .. "|t " .. text
+				return text
+			end
+		end
+	end
+
+	return text
 end
 
 DF.CLEncounterID = {
@@ -4204,12 +4262,13 @@ end
 		end
 	}
 
-	function DF:SetEnvironment(func, environmentHandle)
+	function DF:SetEnvironment(func, environmentHandle, newEnvironment)
 		environmentHandle = environmentHandle or DF.DefaultSecureScriptEnvironmentHandle
-
-		local newEnvironment = {}
+		newEnvironment = newEnvironment or {}
 
 		setmetatable(newEnvironment, environmentHandle)
 		_G.setfenv(func, newEnvironment)
 	end
 
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
