@@ -187,26 +187,29 @@ function FlashTaskBar.OnInit (self)
 	FlashTaskBar:RegisterEvent ("UPDATE_BATTLEFIELD_STATUS")
 
 	--premade groups ready
-	hooksecurefunc ("LFGListInviteDialog_Show", function()
-		if (FlashTaskBar.db.profile.group_queue) then
-			FlashTaskBar:DoFlash("group_queue")
-			FlashTaskBar.last_flash = 0
-		end
-	end)
+	if (not DetailsFramework.IsTimewalkWoW()) then
+		hooksecurefunc ("LFGListInviteDialog_Show", function()
+			if (FlashTaskBar.db.profile.group_queue) then
+				FlashTaskBar:DoFlash("group_queue")
+				FlashTaskBar.last_flash = 0
+			end
+		end)
 	
-	--lfg lfpvp windows
-	hooksecurefunc ("LFGDungeonReadyStatus_ResetReadyStates", function()
-		if (FlashTaskBar.db.profile.group_queue) then
-			FlashTaskBar:DoFlash("group_queue")
-			FlashTaskBar.last_flash = 0
-		end
-	end)
-	hooksecurefunc ("PVPReadyDialog_Display", function()
-		if (FlashTaskBar.db.profile.arena_queue) then
-			FlashTaskBar:DoFlash("arena_queue")
-			FlashTaskBar.last_flash = 0
-		end
-	end)
+		--lfg lfpvp windows
+		hooksecurefunc ("LFGDungeonReadyStatus_ResetReadyStates", function()
+			if (FlashTaskBar.db.profile.group_queue) then
+				FlashTaskBar:DoFlash("group_queue")
+				FlashTaskBar.last_flash = 0
+			end
+		end)
+
+		hooksecurefunc ("PVPReadyDialog_Display", function()
+			if (FlashTaskBar.db.profile.arena_queue) then
+				FlashTaskBar:DoFlash("arena_queue")
+				FlashTaskBar.last_flash = 0
+			end
+		end)
+	end
 	
 	--general alerts
 	hooksecurefunc ("StaticPopup_Show", function (token, text_arg1, text_arg2, data, insertedFrame)
@@ -642,11 +645,15 @@ function FlashTaskBar.OnInit (self)
 	end
 	
 	function FlashTaskBar:EnableRareMobScan()
-		FlashTaskBar:RegisterEvent ("VIGNETTES_UPDATED", do_rare_mob_scan)
+		if (not DetailsFramework.IsTimewalkWoW()) then
+			FlashTaskBar:RegisterEvent ("VIGNETTES_UPDATED", do_rare_mob_scan)
+		end
 	end
 	
 	function FlashTaskBar:DisableRareMobScan()
-		FlashTaskBar:UnregisterEvent ("VIGNETTES_UPDATED")
+		if (not DetailsFramework.IsTimewalkWoW()) then
+			FlashTaskBar:UnregisterEvent ("VIGNETTES_UPDATED")
+		end
 	end
  
 --> overrides
