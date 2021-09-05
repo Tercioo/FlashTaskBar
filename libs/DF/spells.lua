@@ -4,6 +4,9 @@ if (not DF or not DetailsFrameworkCanLoad) then
 	return 
 end
 
+local IS_WOW_PROJECT_MAINLINE = WOW_PROJECT_ID == WOW_PROJECT_MAINLINE
+local IS_WOW_PROJECT_NOT_MAINLINE = WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE
+
 DF_COOLDOWN_RAID = 4
 DF_COOLDOWN_EXTERNAL = 3
 
@@ -486,7 +489,7 @@ DF.CooldownsBySpec = {
 }
 
 --additional CDs / modifications for classic
-if (WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE) then
+if (IS_WOW_PROJECT_NOT_MAINLINE) then
 	--WARRIOR
 	--Arms
 	DF.CooldownsBySpec[71][12292] = 1 --Death Wish (BCC)
@@ -1009,7 +1012,7 @@ DF.CrowdControlSpells = {
 }
 
 -- additionals for classic
-if (WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE) then
+if (IS_WOW_PROJECT_NOT_MAINLINE) then
 	DF.CrowdControlSpells[99] = nil --demoralizing roar disabled, no CC in tbc
 	
 	--auto-generated
@@ -1295,6 +1298,10 @@ DF.FoodIDs = {
 	[327707] = 2, --stamina +20
 	[327708] = 2, --intellect +20
 	[327709] = 2, --agility +20
+
+	[327704] = 2, --intellect +18
+	[327701] = 2, --strength +18
+	[327705] = 2, --agility +18
 }
 
 DF.PotionIDs = {
