@@ -1,0 +1,10 @@
+tag a244b1a0faa97f42c9ae2a941a85971ecd7779fe v10.0.0.384
+Author:	Tercio Jose <terciob19@hotmail.com>
+Date:	Wed Oct 26 10:19:47 2022 -0300
+
+commit 9c274088bf6ece0044f003f8ac4ac796732f4997
+Author: Tercio Jose <terciob19@hotmail.com>
+Date:   Wed Oct 26 10:19:24 2022 -0300
+
+    Framework update
+
