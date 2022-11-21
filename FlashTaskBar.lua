@@ -363,8 +363,8 @@ function FlashTaskBar.OnInit (self)
 	function FlashTaskBar:BAG_UPDATE()
 		if (FlashTaskBar.db.profile.bags_full) then
 			for backpack = 0, 4 do
-				for slot = 1, GetContainerNumSlots (backpack) do
-					local itemId = GetContainerItemID (backpack, slot)
+				for slot = 1, C_Container.GetContainerNumSlots (backpack) do
+					local itemId = C_Container.GetContainerItemID (backpack, slot)
 					if (not itemId) then
 						return
 					end
