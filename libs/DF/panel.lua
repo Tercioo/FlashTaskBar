@@ -1971,16 +1971,25 @@ function detailsFramework:CreateScaleBar(frame, config) --~scale
 end
 
 local no_options = {}
---[=[
-	options available to panel_options:
-	NoScripts = false, --if true, won't set OnMouseDown and OnMouseUp (won't be movable)
-	NoTUISpecialFrame = false, --if true, won't add the frame to 'UISpecialFrames'
-	DontRightClickClose = false, --if true, won't make the frame close when clicked with the right mouse button
-	UseScaleBar = false, --if true, will create a scale bar in the top left corner (require a table on 'db' to save the scale)
-	UseStatusBar = false, --if true, creates a status bar at the bottom of the frame (frame.StatusBar)
-	NoCloseButton = false, --if true, won't show the close button
-	NoTitleBar = false, --if true, don't create the title bar
-]=]
+
+---create a simple panel with a title bar, a close button and a background
+---already has onmousedown and onmouseup scripts to make it movable
+---the panelOptions table can be used to set some options:
+---NoScripts = false, --if true, won't set OnMouseDown and OnMouseUp (won't be movable)
+---NoTUISpecialFrame = false, --if true, won't add the frame to 'UISpecialFrames'
+---DontRightClickClose = false, --if true, won't make the frame close when clicked with the right mouse button
+---UseScaleBar = false, --if true, will create a scale bar in the top left corner (require a table on 'db' to save the scale)
+---UseStatusBar = false, --if true, creates a status bar at the bottom of the frame (frame.StatusBar)
+---NoCloseButton = false, --if true, won't show the close button
+---NoTitleBar = false, --if true, don't create the title bar
+---@param parent table
+---@param width number|nil
+---@param height number|nil
+---@param title string|nil
+---@param frameName string|nil
+---@param panelOptions table|nil
+---@param savedVariableTable table|nil
+---@return table
 function detailsFramework:CreateSimplePanel(parent, width, height, title, frameName, panelOptions, savedVariableTable)
 	if (savedVariableTable and frameName and not savedVariableTable[frameName]) then
 		savedVariableTable[frameName] = {
@@ -3508,24 +3517,24 @@ local tab_container_on_show = function(self)
 	self.SelectIndex (self.AllButtons[index], nil, index)
 end
 
-function detailsFramework:CreateTabContainer (parent, title, frame_name, frameList, options_table, hookList)
+function detailsFramework:CreateTabContainer (parent, title, frameName, frameList, optionsTable, hookList, languageInfo)
 	local options_text_template = detailsFramework:GetTemplate("font", "OPTIONS_FONT_TEMPLATE")
 	local options_dropdown_template = detailsFramework:GetTemplate("dropdown", "OPTIONS_DROPDOWN_TEMPLATE")
 	local options_switch_template = detailsFramework:GetTemplate("switch", "OPTIONS_CHECKBOX_TEMPLATE")
 	local options_slider_template = detailsFramework:GetTemplate("slider", "OPTIONS_SLIDER_TEMPLATE")
 	local options_button_template = detailsFramework:GetTemplate("button", "OPTIONS_BUTTON_TEMPLATE")
 
-	options_table = options_table or {}
+	optionsTable = optionsTable or {}
 	local parentFrameWidth = parent:GetWidth()
-	local y_offset = options_table.y_offset or 0
-	local buttonWidth = options_table.button_width or 160
-	local buttonHeight = options_table.button_height or 20
-	local buttonAnchorX = options_table.button_x or 230
-	local buttonAnchorY = options_table.button_y or -32
-	local button_text_size = options_table.button_text_size or 10
-	local containerWidthOffset = options_table.container_width_offset or 0
+	local y_offset = optionsTable.y_offset or 0
+	local buttonWidth = optionsTable.button_width or 160
+	local buttonHeight = optionsTable.button_height or 20
+	local buttonAnchorX = optionsTable.button_x or 230
+	local buttonAnchorY = optionsTable.button_y or -32
+	local button_text_size = optionsTable.button_text_size or 10
+	local containerWidthOffset = optionsTable.container_width_offset or 0
 
-	local mainFrame = CreateFrame("frame", frame_name, parent.widget or parent, "BackdropTemplate")
+	local mainFrame = CreateFrame("frame", frameName, parent.widget or parent, "BackdropTemplate")
 	mainFrame:SetAllPoints()
 	detailsFramework:Mixin(mainFrame, detailsFramework.TabContainerFunctions)
 	mainFrame.hookList = hookList or {}
@@ -3539,50 +3548,68 @@ function detailsFramework:CreateTabContainer (parent, title, frame_name, frameLi
 	mainFrame.AllButtons = {}
 	mainFrame.CurrentIndex = 1
 	mainFrame.IsContainer = true
-	mainFrame.ButtonSelectedBorderColor = options_table.button_selected_border_color or {1, 1, 0, 1}
-	mainFrame.ButtonNotSelectedBorderColor = options_table.button_border_color or {0, 0, 0, 0}
+	mainFrame.ButtonSelectedBorderColor = optionsTable.button_selected_border_color or {1, 1, 0, 1}
+	mainFrame.ButtonNotSelectedBorderColor = optionsTable.button_border_color or {0, 0, 0, 0}
 
-	if (options_table.right_click_interact ~= nil) then
-		mainFrame.CanCloseWithRightClick = options_table.right_click_interact
+	if (optionsTable.right_click_interact ~= nil) then
+		mainFrame.CanCloseWithRightClick = optionsTable.right_click_interact
 	else
 		mainFrame.CanCloseWithRightClick = true
 	end
 
-	for i, frame in ipairs(frameList) do
-		local f = CreateFrame("frame", "$parent" .. frame.name, mainFrame, "BackdropTemplate")
+	--languageInfo
+	local addonId = languageInfo and languageInfo.language_addonId or "none"
+
+	for i, frameInfo in ipairs(frameList) do
+		local f = CreateFrame("frame", "$parent" .. frameInfo.name, mainFrame, "BackdropTemplate")
 		f:SetAllPoints()
 		f:SetFrameLevel(210)
 		f:Hide()
 
-		local title = detailsFramework:CreateLabel(f, frame.title, 16, "silver")
+		--attempt to get the localized text from the language system using the addonId and the frameInfo.title
+		local phraseId = frameInfo.title
+		local bIsLanguagePrahseID = detailsFramework.Language.DoesPhraseIDExistsInDefaultLanguage(addonId, phraseId)
+
+		local title = detailsFramework:CreateLabel(f, "", 16, "silver")
+		if (bIsLanguagePrahseID) then
+			DetailsFramework.Language.RegisterObjectWithDefault(addonId, title.widget, frameInfo.title, frameInfo.title)
+		else
+			title:SetText(frameInfo.title)
+		end
+
 		title:SetPoint("topleft", mainTitle, "bottomleft", 0, 0)
 		f.titleText = title
 
-		local tabButton = detailsFramework:CreateButton(mainFrame, detailsFramework.TabContainerFunctions.SelectIndex, buttonWidth, buttonHeight, frame.title, i, nil, nil, nil, "$parentTabButton" .. frame.name, false, button_tab_template)
+		local tabButton = detailsFramework:CreateButton(mainFrame, detailsFramework.TabContainerFunctions.SelectIndex, buttonWidth, buttonHeight, frameInfo.title, i, nil, nil, nil, "$parentTabButton" .. frameInfo.name, false, button_tab_template)
+
+		if (bIsLanguagePrahseID) then
+			DetailsFramework.Language.RegisterObjectWithDefault(addonId, tabButton.widget, frameInfo.title, frameInfo.title)
+		end
+
 		PixelUtil.SetSize(tabButton, buttonWidth, buttonHeight)
 		tabButton:SetFrameLevel(220)
 		tabButton.textsize = button_text_size
 		tabButton.mainFrame = mainFrame
-		detailsFramework.TabContainerFunctions.CreateUnderlineGlow (tabButton)
+		detailsFramework.TabContainerFunctions.CreateUnderlineGlow(tabButton)
 
-		local right_click_to_back
-		if (i == 1 or options_table.rightbutton_always_close) then
-			right_click_to_back = detailsFramework:CreateLabel(f, "right click to close", 10, "gray")
-			right_click_to_back:SetPoint("bottomright", f, "bottomright", -1, options_table.right_click_y or 0)
-			if (options_table.close_text_alpha) then
-				right_click_to_back:SetAlpha(options_table.close_text_alpha)
+		local rightClickToBack
+		if (i == 1 or optionsTable.rightbutton_always_close) then
+			rightClickToBack = detailsFramework:CreateLabel(f, "right click to close", 10, "gray")
+			rightClickToBack:SetPoint("bottomright", f, "bottomright", -1, optionsTable.right_click_y or 0)
+			if (optionsTable.close_text_alpha) then
+				rightClickToBack:SetAlpha(optionsTable.close_text_alpha)
 			end
 			f.IsFrontPage = true
 		else
-			right_click_to_back = detailsFramework:CreateLabel(f, "right click to go back to main menu", 10, "gray")
-			right_click_to_back:SetPoint("bottomright", f, "bottomright", -1, options_table.right_click_y or 0)
-			if (options_table.close_text_alpha) then
-				right_click_to_back:SetAlpha(options_table.close_text_alpha)
+			rightClickToBack = detailsFramework:CreateLabel(f, "right click to go back to main menu", 10, "gray")
+			rightClickToBack:SetPoint("bottomright", f, "bottomright", -1, optionsTable.right_click_y or 0)
+			if (optionsTable.close_text_alpha) then
+				rightClickToBack:SetAlpha(optionsTable.close_text_alpha)
 			end
 		end
 
-		if (options_table.hide_click_label) then
-			right_click_to_back:Hide()
+		if (optionsTable.hide_click_label) then
+			rightClickToBack:Hide()
 		end
 
 		f:SetScript("OnMouseDown", detailsFramework.TabContainerFunctions.OnMouseDown)
@@ -3619,6 +3646,7 @@ function detailsFramework:CreateTabContainer (parent, title, frame_name, frameLi
 	--select the first frame
 	mainFrame.SelectIndex (mainFrame.AllButtons[1], nil, 1)
 
+	print()
 	return mainFrame
 end
 
@@ -3780,62 +3808,77 @@ local simple_list_box_SetData = function(self, t)
 	self.list_table = t
 end
 
-function detailsFramework:CreateSimpleListBox (parent, name, title, empty_text, list_table, onclick, options)
-	local f = CreateFrame("frame", name, parent, "BackdropTemplate")
+function detailsFramework:CreateSimpleListBox(parent, name, title, emptyText, listTable, onClick, options)
+	local scroll = CreateFrame("frame", name, parent, "BackdropTemplate")
 
-	f.ResetWidgets = simple_list_box_ResetWidgets
-	f.GetOrCreateWidget = simple_list_box_GetOrCreateWidget
-	f.Refresh = simple_list_box_RefreshWidgets
-	f.SetData = simple_list_box_SetData
-	f.nextWidget = 1
-	f.list_table = list_table
-	f.func = function(self, button, value)
-		--onclick (value)
-		detailsFramework:QuickDispatch(onclick, value)
-		f:Refresh()
+	scroll.ResetWidgets = simple_list_box_ResetWidgets
+	scroll.GetOrCreateWidget = simple_list_box_GetOrCreateWidget
+	scroll.Refresh = simple_list_box_RefreshWidgets
+	scroll.SetData = simple_list_box_SetData
+	scroll.nextWidget = 1
+	scroll.list_table = listTable
+
+	scroll.func = function(self, button, value)
+		detailsFramework:QuickDispatch(onClick, value)
+		scroll:Refresh()
 	end
-	f.widgets = {}
+	scroll.widgets = {}
 
-	detailsFramework:ApplyStandardBackdrop(f)
+	detailsFramework:ApplyStandardBackdrop(scroll)
 
-	f.options = options or {}
-	self.table.deploy(f.options, default_options)
+	scroll.options = options or {}
+	self.table.deploy(scroll.options, default_options)
 
-	if (f.options.x_button_func) then
-		local original_X_function = f.options.x_button_func
-		f.options.x_button_func = function(self, button, value)
+	if (scroll.options.x_button_func) then
+		local original_X_function = scroll.options.x_button_func
+		scroll.options.x_button_func = function(self, button, value)
 			detailsFramework:QuickDispatch(original_X_function, value)
-			f:Refresh()
+			scroll:Refresh()
 		end
 	end
 
-	f:SetBackdropBorderColor(unpack(f.options.panel_border_color))
+	scroll:SetBackdropBorderColor(unpack(scroll.options.panel_border_color))
 
-	f:SetSize(f.options.width + 2, f.options.height)
+	scroll:SetSize(scroll.options.width + 2, scroll.options.height)
 
-	local name = detailsFramework:CreateLabel(f, title, 12, "silver")
+	local name = detailsFramework:CreateLabel(scroll, title, 12, "silver")
 	name:SetTemplate(detailsFramework:GetTemplate("font", "OPTIONS_FONT_TEMPLATE"))
-	name:SetPoint("bottomleft", f, "topleft", 0, 2)
-	f.Title = name
+	name:SetPoint("bottomleft", scroll, "topleft", 0, 2)
+	scroll.Title = name
 
-	local emptyLabel = detailsFramework:CreateLabel(f, empty_text, 12, "gray")
+	local emptyLabel = detailsFramework:CreateLabel(scroll, emptyText, 12, "gray")
 	emptyLabel:SetAlpha(.6)
-	emptyLabel:SetSize(f.options.width-10, f.options.height)
+	emptyLabel:SetSize(scroll.options.width-10, scroll.options.height)
 	emptyLabel:SetPoint("center", 0, 0)
 	emptyLabel:Hide()
 	emptyLabel.align = "center"
-	f.EmptyLabel = emptyLabel
+	scroll.EmptyLabel = emptyLabel
 
-	return f
+	return scroll
 end
 
 
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 -- ~scrollbox
 
-function detailsFramework:CreateScrollBox (parent, name, refreshFunc, data, width, height, lineAmount, lineHeight, createLineFunc, autoAmount, noScroll)
+---create a scrollbox with the methods :Refresh() :SetData() :CreateLine()
+---@param parent table
+---@param name string
+---@param refreshFunc function
+---@param data table
+---@param width number
+---@param height number
+---@param lineAmount number
+---@param lineHeight number
+---@param createLineFunc function|nil
+---@param autoAmount boolean|nil
+---@param noScroll boolean|nil
+---@return table
+function detailsFramework:CreateScrollBox(parent, name, refreshFunc, data, width, height, lineAmount, lineHeight, createLineFunc, autoAmount, noScroll)
+	--create the scrollframe, it is the base of the scrollbox
 	local scroll = CreateFrame("scrollframe", name, parent, "FauxScrollFrameTemplate, BackdropTemplate")
 
+	--apply the standard background color
 	detailsFramework:ApplyStandardBackdrop(scroll)
 
 	scroll:SetSize(width, height)
@@ -4459,8 +4502,11 @@ end
 
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 -- ~standard backdrop
-
-function detailsFramework:ApplyStandardBackdrop(frame, solidColor, alphaScale)
+---this is the standard backdrop for detailsframework, it's a dark-ish color semi transparent with a thin opaque black border
+---@param frame table
+---@param bUseSolidColor any
+---@param alphaScale number
+function detailsFramework:ApplyStandardBackdrop(frame, bUseSolidColor, alphaScale)
 	alphaScale = alphaScale or 0.95
 
 	if (not frame.SetBackdrop)then
@@ -4470,7 +4516,7 @@ function detailsFramework:ApplyStandardBackdrop(frame, solidColor, alphaScale)
 
 	local red, green, blue, alpha = detailsFramework:GetDefaultBackdropColor()
 
-	if (solidColor) then
+	if (bUseSolidColor) then
 		local colorDeviation = 0.05
 		frame:SetBackdrop({edgeFile = [[Interface\Buttons\WHITE8X8]], edgeSize = 1, bgFile = [[Interface\Buttons\WHITE8X8]], tileSize = 32, tile = true})
 		frame:SetBackdropColor(red, green, blue, 0.872)
@@ -5036,6 +5082,10 @@ detailsFramework.HeaderFunctions = {
 	AddFrameToHeaderAlignment = function(self, frame)
 		self.FramesToAlign = self.FramesToAlign or {}
 		tinsert(self.FramesToAlign, frame)
+	end,
+
+	GetFramesFromHeaderAlignment = function(self, frame)
+		return self.FramesToAlign or {}
 	end,
 
 	--@self: an object like a line
@@ -6014,13 +6064,15 @@ function detailsFramework:OpenLoadConditionsPanel(optionsTable, callback, frameO
 			if IS_WOW_PROJECT_MAINLINE then
 				local talentList = {}
 				for _, talentTable in ipairs(detailsFramework:GetCharacterTalents()) do
-					tinsert(talentList, {
-						name = talentTable.Name,
-						set = loadConditionsFrame.OnRadioCheckboxClick,
-						param = talentTable.ID,
-						get = function() return loadConditionsFrame.OptionsTable.talent [talentTable.ID] or loadConditionsFrame.OptionsTable.talent [talentTable.ID .. ""] end,
-						texture = talentTable.Texture,
-					})
+					if talentTable.ID then
+						tinsert(talentList, {
+							name = talentTable.Name,
+							set = loadConditionsFrame.OnRadioCheckboxClick,
+							param = talentTable.ID,
+							get = function() return loadConditionsFrame.OptionsTable.talent [talentTable.ID] or loadConditionsFrame.OptionsTable.talent [talentTable.ID .. ""] end,
+							texture = talentTable.Texture,
+						})
+					end
 				end
 				local talentGroup = detailsFramework:CreateCheckboxGroup (loadConditionsFrame, talentList, name, {width = 200, height = 200, title = "Characer Talents"}, {offset_x = 150, amount_per_line = 3})
 				talentGroup:SetPoint("topleft", loadConditionsFrame, "topleft", anchorPositions.talent [1], anchorPositions.talent [2])
@@ -6317,13 +6369,15 @@ function detailsFramework:OpenLoadConditionsPanel(optionsTable, callback, frameO
 				--update the talents (might have changed if the player changed its specialization)
 				local talentList = {}
 				for _, talentTable in ipairs(detailsFramework:GetCharacterTalents()) do
-					tinsert(talentList, {
-						name = talentTable.Name,
-						set = DetailsFrameworkLoadConditionsPanel.OnRadioCheckboxClick,
-						param = talentTable.ID,
-						get = function() return DetailsFrameworkLoadConditionsPanel.OptionsTable.talent [talentTable.ID] or DetailsFrameworkLoadConditionsPanel.OptionsTable.talent [talentTable.ID .. ""] end,
-						texture = talentTable.Texture,
-					})
+					if talentTable.ID then
+						tinsert(talentList, {
+							name = talentTable.Name,
+							set = DetailsFrameworkLoadConditionsPanel.OnRadioCheckboxClick,
+							param = talentTable.ID,
+							get = function() return DetailsFrameworkLoadConditionsPanel.OptionsTable.talent [talentTable.ID] or DetailsFrameworkLoadConditionsPanel.OptionsTable.talent [talentTable.ID .. ""] end,
+							texture = talentTable.Texture,
+						})
+					end
 				end
 				DetailsFrameworkLoadConditionsPanel.TalentGroup:SetOptions (talentList)
 			end
@@ -6830,8 +6884,10 @@ detailsFramework.StatusBarFunctions = {
 		self.barTextureMask:SetTexture([[Interface\CHATFRAME\CHATFRAMEBACKGROUND]])
 
 		--border texture
-		self.barBorderTextureForMask = self:CreateTexture(nil, "artwork", nil, 7)
+		self.barBorderTextureForMask = self:CreateTexture(nil, "overlay", nil, 7)
 		self.barBorderTextureForMask:SetAllPoints()
+		--self.barBorderTextureForMask:SetPoint("topleft", self, "topleft", -1, 1)
+		--self.barBorderTextureForMask:SetPoint("bottomright", self, "bottomright", 1, -1)
 		self.barBorderTextureForMask:Hide()
 
 		barTexture:AddMaskTexture(self.barTextureMask)
@@ -7279,7 +7335,6 @@ detailsFramework.StatusBarFunctions = {
 			self:UpdateHealPrediction()
 		end
 
-
 -- ~healthbar
 function detailsFramework:CreateHealthBar (parent, name, settingsOverride)
 
@@ -7625,6 +7680,9 @@ detailsFramework.CastFrameFunctions = {
 		{"UNIT_SPELLCAST_CHANNEL_START"},
 		{"UNIT_SPELLCAST_CHANNEL_UPDATE"},
 		{"UNIT_SPELLCAST_CHANNEL_STOP"},
+		{(IS_WOW_PROJECT_MAINLINE) and "UNIT_SPELLCAST_EMPOWER_START"},
+		{(IS_WOW_PROJECT_MAINLINE) and "UNIT_SPELLCAST_EMPOWER_UPDATE"},
+		{(IS_WOW_PROJECT_MAINLINE) and "UNIT_SPELLCAST_EMPOWER_STOP"},
 		{(IS_WOW_PROJECT_MAINLINE) and "UNIT_SPELLCAST_INTERRUPTIBLE"},
 		{(IS_WOW_PROJECT_MAINLINE) and "UNIT_SPELLCAST_NOT_INTERRUPTIBLE"},
 		{"PLAYER_ENTERING_WORLD"},
@@ -7643,6 +7701,8 @@ detailsFramework.CastFrameFunctions = {
 		FadeOutTime = 0.5, --amount of time in seconds to go from 100% to zero alpha when the cast finishes
 		CanLazyTick = true, --if true, it'll execute the lazy tick function, it ticks in a much slower pace comparece with the regular tick
 		LazyUpdateCooldown = 0.2, --amount of time to wait for the next lazy update, this updates non critical things like the cast timer
+
+		ShowEmpoweredDuration = true, --full hold time for empowered spells
 
 		FillOnInterrupt = true,
 		HideSparkOnInterrupt = true,
@@ -7953,7 +8013,7 @@ detailsFramework.CastFrameFunctions = {
 					--[[if not self.spellEndTime then
 						self:UpdateChannelInfo(self.unit)
 					end]]--
-					self.value = self.spellEndTime - GetTime()
+					self.value = self.empowered and (GetTime() - self.spellStartTime) or (self.spellEndTime - GetTime())
 				end
 
 				self:RunHooksForWidget("OnShow", self, self.unit)
@@ -7992,7 +8052,7 @@ detailsFramework.CastFrameFunctions = {
 					self.percentText:SetText(format("%.1f", abs(self.value - self.maxValue)))
 
 				elseif (self.channeling) then
-					local remainingTime = abs(self.value)
+					local remainingTime = self.empowered and abs(self.value - self.maxValue) or abs(self.value)
 					if (remainingTime > 999) then
 						self.percentText:SetText("")
 					else
@@ -8022,6 +8082,7 @@ detailsFramework.CastFrameFunctions = {
 		--update spark position
 		local sparkPosition = self.value / self.maxValue * self:GetWidth()
 		self.Spark:SetPoint("center", self, "left", sparkPosition + self.Settings.SparkOffset, 0)
+		
 
 		--in order to allow the lazy tick run, it must return true, it tell that the cast didn't finished
 		return true
@@ -8029,7 +8090,7 @@ detailsFramework.CastFrameFunctions = {
 
 	--tick function for channeling casts
 	OnTick_Channeling = function(self, deltaTime)
-		self.value = self.value - deltaTime
+		self.value = self.empowered and self.value + deltaTime or self.value - deltaTime
 
 		if (self:CheckCastIsDone()) then
 			return
@@ -8040,6 +8101,8 @@ detailsFramework.CastFrameFunctions = {
 		--update spark position
 		local sparkPosition = self.value / self.maxValue * self:GetWidth()
 		self.Spark:SetPoint("center", self, "left", sparkPosition + self.Settings.SparkOffset, 0)
+		
+		self:CreateOrUpdateEmpoweredPips()
 
 		return true
 	end,
@@ -8172,6 +8235,14 @@ detailsFramework.CastFrameFunctions = {
 		if (not self:IsValid (unit, name, isTradeSkill, true)) then
 			return
 		end
+		
+		--empowered? no!
+			self.holdAtMaxTime = nil
+			self.empowered = false
+			self.curStage = nil
+			self.numStages = nil
+			self.empStages = nil
+			self:CreateOrUpdateEmpoweredPips()
 
 		--setup cast
 			self.casting = true
@@ -8208,7 +8279,7 @@ detailsFramework.CastFrameFunctions = {
 			--set the statusbar color
 			self:UpdateCastColor()
 
-			if (not self:IsShown()) then
+			if (not self:IsShown() and not self.Settings.NoFadeEffects) then
 				self:Animation_FadeIn()
 			end
 
@@ -8226,14 +8297,98 @@ detailsFramework.CastFrameFunctions = {
 
 		self:RunHooksForWidget("OnCastStart", self, self.unit, "UNIT_SPELLCAST_START")
 	end,
+	
+	CreateOrUpdateEmpoweredPips = function(self, unit, numStages, startTime, endTime)
+		unit = unit or self.unit
+		numStages = numStages or self.numStages
+		startTime = startTime or ((self.spellStartTime or 0) * 1000)
+		endTime = endTime or ((self.spellEndTime or 0) * 1000)
+		
+		if not self.empStages or not numStages or numStages <= 0 then
+			self.stagePips = self.stagePips or {}
+			for i, stagePip in pairs(self.stagePips) do
+				stagePip:Hide()
+			end
+			return
+		end
+		
+		local width = self:GetWidth()
+		local height = self:GetHeight()
+		for i = 1, numStages, 1 do
+			local curStartTime = self.empStages[i] and self.empStages[i].start
+			local curEndTime = self.empStages[i] and self.empStages[i].finish
+			local curDuration = curEndTime - curStartTime
+			local offset = width * curEndTime / (endTime - startTime) * 1000
+			if curDuration > -1 then
+				
+				stagePip = self.stagePips[i]
+				if not stagePip then
+					stagePip = self:CreateTexture(nil, "overlay", nil, 2)
+					stagePip:SetBlendMode("ADD")
+					stagePip:SetTexture([[Interface\CastingBar\UI-CastingBar-Spark]])
+					stagePip:SetTexCoord(11/32,18/32,9/32,23/32)
+					stagePip:SetSize(2, height)
+					--stagePip = CreateFrame("FRAME", nil, self, "CastingBarFrameStagePipTemplate")
+					self.stagePips[i] = stagePip
+				end
+				
+				stagePip:ClearAllPoints()
+				--stagePip:SetPoint("TOP", self, "TOPLEFT", offset, -1)
+				--stagePip:SetPoint("BOTTOM", self, "BOTTOMLEFT", offset, 1)
+				--stagePip.BasePip:SetVertexColor(1, 1, 1, 1)
+				stagePip:SetPoint("CENTER", self, "LEFT", offset, 0)
+				stagePip:SetVertexColor(1, 1, 1, 1)
+				stagePip:Show()
+			end
+		end
+	end,
 
 	UpdateChannelInfo = function(self, unit, ...)
-		local name, text, texture, startTime, endTime, isTradeSkill, notInterruptible, spellID = UnitChannelInfo (unit)
+		local name, text, texture, startTime, endTime, isTradeSkill, notInterruptible, spellID, _, numStages = UnitChannelInfo (unit)
 
 		--is valid?
 		if (not self:IsValid (unit, name, isTradeSkill, true)) then
 			return
 		end
+		
+		--empowered?
+			self.empStages = {}
+			self.stagePips = self.stagePips or {}
+			for i, stagePip in pairs(self.stagePips) do
+				stagePip:Hide()
+			end
+			
+			if numStages and numStages > 0 then
+				self.holdAtMaxTime = GetUnitEmpowerHoldAtMaxTime(self.unit)
+				self.empowered = true
+				self.numStages = numStages
+				
+
+				local lastStageEndTime = 0
+				for i = 1, numStages do
+					self.empStages[i] = {
+						start = lastStageEndTime,
+						finish = lastStageEndTime + GetUnitEmpowerStageDuration(unit, i - 1) / 1000,
+					}
+					lastStageEndTime = self.empStages[i].finish
+					
+					if startTime / 1000 + lastStageEndTime <= GetTime() then
+						self.curStage = i
+					end
+				end
+				
+				if (self.Settings.ShowEmpoweredDuration) then
+					endTime = endTime + self.holdAtMaxTime
+				end
+				
+				--create/update pips
+				self:CreateOrUpdateEmpoweredPips(unit, numStages, startTime, endTime)
+			else
+				self.holdAtMaxTime = nil
+				self.empowered = false
+				self.curStage = nil
+				self.numStages = nil
+			end
 
 		--setup cast
 			self.casting = nil
@@ -8248,8 +8403,9 @@ detailsFramework.CastFrameFunctions = {
 			self.spellTexture = texture
 			self.spellStartTime = startTime / 1000
 			self.spellEndTime = endTime / 1000
-			self.value = self.spellEndTime - GetTime()
+			self.value = self.empowered and (GetTime() - self.spellStartTime) or (self.spellEndTime - GetTime())
 			self.maxValue = self.spellEndTime - self.spellStartTime
+			self.reverseChanneling = self.empowered
 
 			self:SetMinMaxValues(0, self.maxValue)
 			self:SetValue(self.value)
@@ -8271,7 +8427,7 @@ detailsFramework.CastFrameFunctions = {
 			--set the statusbar color
 			self:UpdateCastColor()
 
-			if (not self:IsShown()) then
+			if (not self:IsShown() and not self.Settings.NoFadeEffects) then
 				self:Animation_FadeIn()
 			end
 
@@ -8366,6 +8522,18 @@ detailsFramework.CastFrameFunctions = {
 			self:UpdateCastColor()
 		end
 	end,
+	
+	UNIT_SPELLCAST_EMPOWER_START = function(self, unit, ...)
+		self:UNIT_SPELLCAST_CHANNEL_START(unit, ...)
+	end,
+	
+	UNIT_SPELLCAST_EMPOWER_UPDATE = function(self, unit, ...)
+		self:UNIT_SPELLCAST_CHANNEL_UPDATE(unit, ...)
+	end,
+	
+	UNIT_SPELLCAST_EMPOWER_STOP = function(self, unit, ...)
+		self:UNIT_SPELLCAST_CHANNEL_STOP(unit, ...)
+	end,
 
 	UNIT_SPELLCAST_FAILED = function(self, unit, ...)
 		local unitID, castID, spellID = ...
@@ -8431,7 +8599,7 @@ detailsFramework.CastFrameFunctions = {
 	end,
 
 	UNIT_SPELLCAST_CHANNEL_UPDATE = function(self, unit, ...)
-		local name, text, texture, startTime, endTime, isTradeSkill = UnitChannelInfo (unit)
+		local name, text, texture, startTime, endTime, isTradeSkill, notInterruptible, spellID, _, numStages = UnitChannelInfo (unit)
 
 		if (not self:IsValid (unit, name, isTradeSkill)) then
 			return
@@ -8440,13 +8608,13 @@ detailsFramework.CastFrameFunctions = {
 		--update the cast time
 		self.spellStartTime = startTime / 1000
 		self.spellEndTime = endTime / 1000
-		self.value = self.spellEndTime - GetTime()
+		self.value = self.empowered and (GetTime() - self.spellStartTime) or (self.spellEndTime - GetTime())
+		self.maxValue = self.spellEndTime - self.spellStartTime
 
-		if (self.value < 0) then
+		if (self.value < 0 or self.value > self.maxValue) then
 			self.value = 0
 		end
 
-		self.maxValue = self.spellEndTime - self.spellStartTime
 		self:SetMinMaxValues(0, self.maxValue)
 		self:SetValue(self.value)
 	end,

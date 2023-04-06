@@ -54,7 +54,8 @@ local default_config = {
 		low_health = false,
 		lost_health = false,
 		player_died = true,
-		
+		chromie_chest = false,
+
 		sound_enabled = {
 			readycheck = {enabled = false, sound = "d_whip1"},
 			arena_queue = {enabled = false, sound = "d_whip1"},
@@ -287,7 +288,21 @@ function FlashTaskBar.OnInit (self)
 	end
 	FlashTaskBar:RegisterComm ("D4", "CommReceived")
 	FlashTaskBar:RegisterComm ("BigWigs", "CommReceived")
-	
+
+	--scenario update
+	function FlashTaskBar:SCENARIO_UPDATE()
+		if (FlashTaskBar.db.profile.chromie_chest) then
+			if (C_Map) then
+				local mapId = C_Map.GetBestMapForUnit("player")
+				if (not mapId or mapId ~= 2025) then
+					return
+				end
+				FlashTaskBar:DoFlash("chromie_chest")
+			end
+		end
+	end
+	FlashTaskBar:RegisterEvent("SCENARIO_UPDATE")
+
 	--readycheck
 	function FlashTaskBar:READY_CHECK()
 		if (FlashTaskBar.db.profile.readycheck) then
@@ -951,6 +966,18 @@ function FlashTaskBar.OnInit (self)
 				end
 			end,
 		},
+
+		{
+			type = "toggle",
+			name = "Chromie Chest",
+			desc = "Chromie Chest",
+			order = 6,
+			get = function() return FlashTaskBar.db.profile.chromie_chest end,
+			set = function (self, val)
+				FlashTaskBar.db.profile.chromie_chest = not FlashTaskBar.db.profile.chromie_chest
+			end,
+		},
+		
 	}
 	
 	local options_text_template = FlashTaskBar:GetTemplate ("font", "OPTIONS_FONT_TEMPLATE")
@@ -967,7 +994,8 @@ function FlashTaskBar.OnInit (self)
 	general_settings_frame:SetPoint ("topleft", 0, 0)
 	general_settings_frame:SetSize (1, 1)
 	
-	FlashTaskBar:BuildMenu (general_settings_frame, options, 15, -77, 280, true, options_text_template, options_dropdown_template, options_switch_template, true, options_slider_template, options_button_template)
+	options.always_boxfirst = true
+	FlashTaskBar:BuildMenu(general_settings_frame, options, 15, -77, 280, false, options_text_template, options_dropdown_template, options_switch_template, true, options_slider_template, options_button_template)
 	
 	local y_chat_scan = -250
 	
