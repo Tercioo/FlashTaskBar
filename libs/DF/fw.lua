@@ -1,6 +1,6 @@
 
 
-local dversion = 421
+local dversion = 447
 local major, minor = "DetailsFramework-1.0", dversion
 local DF, oldminor = LibStub:NewLibrary(major, minor)
 
@@ -124,13 +124,14 @@ end
 
 ---return true if the player is playing in the WotLK version of wow with the retail api
 ---@return boolean
-function DF.IsWotLKWowWithRetailAPI()
+function DF.IsNonRetailWowWithRetailAPI()
     local _, _, _, buildInfo = GetBuildInfo()
-    if (buildInfo < 40000 and buildInfo >= 30401) then
+    if (buildInfo < 40000 and buildInfo >= 30401) or (buildInfo < 20000 and buildInfo >= 11404) then
         return true
     end
 	return false
 end
+DF.IsWotLKWowWithRetailAPI = DF.IsNonRetailWowWithRetailAPI -- this is still in use
 
 ---return true if the version of wow the player is playing is the shadowlands
 function DF.IsShadowlandsWow()
@@ -263,7 +264,7 @@ function DF.UnitGroupRolesAssigned(unitId)
 	end
 end
 
----return the specialization of the player it self
+---return the specializationid of the player it self
 ---@return number|nil
 function DF.GetSpecialization()
 	if (GetSpecialization) then
@@ -272,7 +273,7 @@ function DF.GetSpecialization()
 	return nil
 end
 
----return the specialization using the specId
+---return the specializationid using the specId
 ---@param specId unknown
 function DF.GetSpecializationInfoByID(specId)
 	if (GetSpecializationInfoByID) then
@@ -827,35 +828,51 @@ end
 ---@param value number
 ---@return string
 function DF:IntegerToTimer(value) --~formattime
-	return "" .. floor(value/60) .. ":" .. format("%02.f", value%60)
+	return "" .. math.floor(value/60) .. ":" .. string.format("%02.f", value%60)
 end
 
 ---remove the realm name from a name
 ---@param name string
----@return string
+---@return string, number
 function DF:RemoveRealmName(name)
 	return name:gsub(("%-.*"), "")
 end
 
----remove the realm name from a name
+---remove the owner name of the pet or guardian
+---@param name string
+---@return string, number
+function DF:RemoveOwnerName(name)
+	return name:gsub((" <.*"), "")
+end
+
+---remove realm and owner names also remove brackets from spell actors
 ---@param name string
 ---@return string
+function DF:CleanUpName(name)
+	name =  DF:RemoveRealmName(name)
+	name = DF:RemoveOwnerName(name)
+	name = name:gsub("%[%*%]%s", "")
+	return name
+end
+
+---remove the realm name from a name
+---@param name string
+---@return string, number
 function DF:RemoveRealName(name)
 	return name:gsub(("%-.*"), "")
 end
 
 ---get the UIObject of type 'FontString' named fontString and set the font size to the maximum value of the arguments
----@param fontString FontString
+---@param fontString fontstring
 ---@vararg number
 function DF:SetFontSize(fontString, ...)
 	local font, _, flags = fontString:GetFont()
-	fontString:SetFont(font, max(...), flags)
+	fontString:SetFont(font, math.max(...), flags)
 end
 
 ---get the UIObject of type 'FontString' named fontString and set the font to the argument fontface
----@param fontString FontString
+---@param fontString fontstring
 ---@param fontface string
----@return nil
 function DF:SetFontFace(fontString, fontface)
 	local font = SharedMedia:Fetch("font", fontface, true)
 	if (font) then
@@ -867,26 +884,24 @@ function DF:SetFontFace(fontString, fontface)
 end
 
 ---get the FontString passed and set the font color
----@param fontString FontString
+---@param fontString fontstring
 ---@param r any
 ---@param g number|nil
 ---@param b number|nil
 ---@param a number|nil
----@return nil
 function DF:SetFontColor(fontString, r, g, b, a)
 	r, g, b, a = DF:ParseColors(r, g, b, a)
 	fontString:SetTextColor(r, g, b, a)
 end
 
 ---get the FontString passed and set the font shadow color and offset
----@param fontString FontString
+---@param fontString fontstring
 ---@param r number
 ---@param g number
 ---@param b number
 ---@param a number
 ---@param x number
 ---@param y number
----@return nil
 function DF:SetFontShadow(fontString, r, g, b, a, x, y)
 	r, g, b, a = DF:ParseColors(r, g, b, a)
 	fontString:SetShadowColor(r, g, b, a)
@@ -899,9 +914,8 @@ function DF:SetFontShadow(fontString, r, g, b, a, x, y)
 end
 
 ---get the FontString object passed and set the rotation of the text shown
----@param fontString FontString
+---@param fontString fontstring
 ---@param degrees number
----@return nil
 function DF:SetFontRotation(fontString, degrees)
 	if (type(degrees) == "number") then
 		if (not fontString.__rotationAnimation) then
@@ -3343,8 +3357,11 @@ function DF:OpenInterfaceProfile()
 end
 
 -----------------------------
---safe copy from blizz api
-function DF:Mixin(object, ...)
+---copy all members from #2 ... to #1 object
+---@param object table
+---@param ... any
+---@return any
+function DF:Mixin(object, ...) --safe copy from blizz api
 	for i = 1, select("#", ...) do
 		local mixin = select(i, ...)
 		for key, value in pairs(mixin) do
@@ -3378,7 +3395,7 @@ function DF:CreateAnimation(animation, animationType, order, duration, arg1, arg
 		anim:SetToAlpha(arg2)
 
 	elseif (animationType == "SCALE") then
-		if (DF.IsDragonflight() or DF.IsWotLKWowWithRetailAPI()) then
+		if (DF.IsDragonflight() or DF.IsNonRetailWowWithRetailAPI()) then
 			anim:SetScaleFrom(arg1, arg2)
 			anim:SetScaleTo(arg3, arg4)
 		else
@@ -4216,6 +4233,12 @@ function DF:ReskinSlider(slider, heightOffset)
 		--up button
 		local offset = 1 --space between the scrollbox and the scrollar
 
+		local backgroundColor_Red = 0.1
+		local backgroundColor_Green = 0.1
+		local backgroundColor_Blue = 0.1
+		local backgroundColor_Alpha = 1
+		local backdrop_Alpha = 0.3
+
 		do
 			local normalTexture = slider.ScrollBar.ScrollUpButton.Normal
 			normalTexture:SetTexture([[Interface\Buttons\Arrow-Up-Up]])
@@ -4240,6 +4263,21 @@ function DF:ReskinSlider(slider, heightOffset)
 			disabledTexture:SetPoint("bottomright", slider.ScrollBar.ScrollUpButton, "bottomright", offset, 0)
 
 			slider.ScrollBar.ScrollUpButton:SetSize(16, 16)
+
+			if (not slider.ScrollBar.ScrollUpButton.BackgroundTexture) then
+				local backgroundTexture = slider.ScrollBar.ScrollUpButton:CreateTexture(nil, "border")
+				slider.ScrollBar.ScrollUpButton.BackgroundTexture = backgroundTexture
+
+				backgroundTexture:SetColorTexture(backgroundColor_Red, backgroundColor_Green, backgroundColor_Blue)
+				backgroundTexture:SetAlpha(backgroundColor_Alpha)
+
+				backgroundTexture:SetPoint("topleft", slider.ScrollBar.ScrollUpButton, "topleft", 1, 0)
+				backgroundTexture:SetPoint("bottomright", slider.ScrollBar.ScrollUpButton, "bottomright", -1, 0)
+			end
+
+			DF:Mixin(slider.ScrollBar.ScrollUpButton, BackdropTemplateMixin)
+			slider.ScrollBar.ScrollUpButton:SetBackdrop({edgeFile = [[Interface\Buttons\WHITE8X8]], edgeSize = 1})
+			slider.ScrollBar.ScrollUpButton:SetBackdropBorderColor(0, 0, 0, backdrop_Alpha)
 		end
 
 		--down button
@@ -4267,6 +4305,21 @@ function DF:ReskinSlider(slider, heightOffset)
 			disabledTexture:SetPoint("bottomright", slider.ScrollBar.ScrollDownButton, "bottomright", offset, -4)
 
 			slider.ScrollBar.ScrollDownButton:SetSize(16, 16)
+
+			if (not slider.ScrollBar.ScrollDownButton.BackgroundTexture) then
+				local backgroundTexture = slider.ScrollBar.ScrollDownButton:CreateTexture(nil, "border")
+				slider.ScrollBar.ScrollDownButton.BackgroundTexture = backgroundTexture
+
+				backgroundTexture:SetColorTexture(backgroundColor_Red, backgroundColor_Green, backgroundColor_Blue)
+				backgroundTexture:SetAlpha(backgroundColor_Alpha)
+
+				backgroundTexture:SetPoint("topleft", slider.ScrollBar.ScrollDownButton, "topleft", 1, 0)
+				backgroundTexture:SetPoint("bottomright", slider.ScrollBar.ScrollDownButton, "bottomright", -1, 0)
+			end
+
+			DF:Mixin(slider.ScrollBar.ScrollDownButton, BackdropTemplateMixin)
+			slider.ScrollBar.ScrollDownButton:SetBackdrop({edgeFile = [[Interface\Buttons\WHITE8X8]], edgeSize = 1})
+			slider.ScrollBar.ScrollDownButton:SetBackdropBorderColor(0, 0, 0, backdrop_Alpha)
 		end
 
 		--if the parent has a editbox, this is a code editor
@@ -4280,7 +4333,21 @@ function DF:ReskinSlider(slider, heightOffset)
 		end
 
 		slider.ScrollBar.ThumbTexture:SetColorTexture(.5, .5, .5, .3)
-		slider.ScrollBar.ThumbTexture:SetSize(12, 8)
+		slider.ScrollBar.ThumbTexture:SetSize(14, 8)
+
+		if (not slider.ScrollBar.SliderTexture) then
+			local alpha = 1
+			local offset = 1
+			slider.ScrollBar.SliderTexture = slider.ScrollBar:CreateTexture(nil, "background")
+			slider.ScrollBar.SliderTexture:SetColorTexture(backgroundColor_Red, backgroundColor_Green, backgroundColor_Blue)
+			slider.ScrollBar.SliderTexture:SetAlpha(backgroundColor_Alpha)
+			slider.ScrollBar.SliderTexture:SetPoint("TOPLEFT", slider.ScrollBar, "TOPLEFT", offset, -2)
+			slider.ScrollBar.SliderTexture:SetPoint("BOTTOMRIGHT", slider.ScrollBar, "BOTTOMRIGHT", -offset, 2)
+		end
+
+		DF:Mixin(slider.ScrollBar, BackdropTemplateMixin)
+		slider.ScrollBar:SetBackdrop({edgeFile = [[Interface\Buttons\WHITE8X8]], edgeSize = 1})
+		slider.ScrollBar:SetBackdropBorderColor(0, 0, 0, backdrop_Alpha)
 	end
 end
 
@@ -4311,7 +4378,7 @@ local specs_per_class = {
 	["WARLOCK"] = {265, 266, 267},
 	["PALADIN"] = {65, 66, 70},
 	["MONK"] = {268, 269, 270},
-	["EVOKER"] = {1467, 1468},
+	["EVOKER"] = {1467, 1468, 1473},
 }
 
 function DF:GetClassSpecIDs(class)
@@ -4742,6 +4809,7 @@ DF.ClassSpecs = {
 	["EVOKER"] = {
 		[1467] = true,
 		[1468] = true,
+		[1473] = true,
 	},
 }
 
@@ -4809,6 +4877,7 @@ DF.SpecListByClass = {
 	["EVOKER"] = {
 		1467,
 		1468,
+		1473,
 	},
 }
 
@@ -5307,3 +5376,21 @@ end
 
 
 -----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+---receives an object and print debug info about its visibility
+---use to know why a frame is not showing
+---@param UIObject any
+function DF:DebugVisibility(UIObject)
+	local bIsShown = UIObject:IsShown()
+	print("Is Shown:", bIsShown and "|cFF00FF00true|r" or "|cFFFF0000false|r")
+
+	local bIsVisible = UIObject:IsVisible()
+	print("Is Visible:", bIsVisible and "|cFF00FF00true|r" or "|cFFFF0000false|r")
+
+	local width, height = UIObject:GetSize()
+	print("Width:", width > 0 and "|cFF00FF00" .. width .. "|r" or "|cFFFF00000|r")
+	print("Height:", height > 0 and "|cFF00FF00" .. height .. "|r" or "|cFFFF00000|r")
+
+	local numPoints = UIObject:GetNumPoints()
+	print("Num Points:", numPoints > 0 and "|cFF00FF00" .. numPoints .. "|r" or "|cFFFF00000|r")
+end
