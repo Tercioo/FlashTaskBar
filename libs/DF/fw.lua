@@ -1,6 +1,6 @@
 
 
-local dversion = 447
+local dversion = 463
 local major, minor = "DetailsFramework-1.0", dversion
 local DF, oldminor = LibStub:NewLibrary(major, minor)
 
@@ -40,7 +40,11 @@ DF.AuthorInfo = {
 }
 
 function DF:Msg(msg, ...)
-	print("|cFFFFFFAA" .. (self.__name or "FW Msg:") .. "|r ", msg, ...)
+	print("|cFFFFFFAA" .. (self.__name or "Details!Framework:") .. "|r ", msg, ...)
+end
+
+function DF:MsgWarning(msg, ...)
+	print("|cFFFFFFAA" .. (self.__name or "Details!Framework") .. "|r |cFFFFAA00[Warning]|r", msg, ...)
 end
 
 local PixelUtil = PixelUtil or DFPixelUtil
@@ -229,14 +233,23 @@ end
 
 ---return the role of the unit, this is safe to use for all versions of wow
 ---@param unitId string
+---@param bUseSupport boolean?
+---@param specId number?
 ---@return string
-function DF.UnitGroupRolesAssigned(unitId)
+function DF.UnitGroupRolesAssigned(unitId, bUseSupport, specId)
 	if (not DF.IsTimewalkWoW()) then --Was function exist check. TBC has function, returns NONE. -Flamanis 5/16/2022
 		local role = UnitGroupRolesAssigned(unitId)
+
+		if (specId == 1473 and bUseSupport) then
+			return "SUPPORT"
+		end
 
 		if (role == "NONE" and UnitIsUnit(unitId, "player")) then
 			local specializationIndex = GetSpecialization() or 0
 			local id, name, description, icon, role, primaryStat = GetSpecializationInfo(specializationIndex)
+			if (id == 1473 and bUseSupport) then
+				return "SUPPORT"
+			end
 			return id and role or "NONE"
 		end
 
@@ -512,7 +525,7 @@ function DF.table.reverse(t)
 	return new
 end
 
----copy the values from table2 to table1, ignore the metatable and UIObjects
+---copy the values from table2 to table1 overwriting existing values, ignores __index and __newindex, keys pointing to a UIObject are preserved
 ---@param t1 table
 ---@param t2 table
 ---@return table
@@ -536,7 +549,7 @@ function DF.table.duplicate(t1, t2)
 	return t1
 end
 
----copy from the table 't2' to table 't1' ignoring the metatable and overwriting values, does copy UIObjects
+---copy the values from table2 to table1 overwriting existing values, ignores __index and __newindex, threat UIObjects as regular tables
 ---@param t1 table
 ---@param t2 table
 ---@return table
@@ -574,6 +587,32 @@ function DF.table.copytocompress(t1, t2)
 	return t1
 end
 
+---remove from table1 the values that are also on table2
+---@param table1 table the table to have the values removed
+---@param table2 table the reference table
+function DF.table.removeduplicate(table1, table2)
+    for key, value in pairs(table2) do
+        if (type(value) == "table") then
+            if (type(table1[key]) == "table") then
+                DF.table.removeduplicate(table1[key], value)
+				if (not next(table1[key])) then
+					table1[key] = nil
+				end
+            end
+        else
+			if (type(table1[key]) == "number" and type(value) == "number") then
+				if (DF:IsNearlyEqual(table1[key], value, 0.0001)) then
+					table1[key] = nil
+				end
+			else
+            	if (table1[key] == value) then
+	                table1[key] = nil
+            	end
+			end
+        end
+    end
+end
+
 ---add the indexes of table2 into the end of the table table1
 ---@param t1 table
 ---@param t2 table
@@ -592,14 +631,82 @@ end
 function DF.table.deploy(t1, t2)
 	for key, value in pairs(t2) do
 		if (type(value) == "table") then
-			t1 [key] = t1 [key] or {}
-			DF.table.deploy(t1 [key], t2 [key])
-		elseif (t1 [key] == nil) then
-			t1 [key] = value
+			t1[key] = t1[key] or {}
+			DF.table.deploy(t1[key], t2[key])
+		elseif (t1[key] == nil) then
+			t1[key] = value
 		end
 	end
 	return t1
 end
+
+local function tableToString(t, resultString, deep, seenTables)
+    resultString = resultString or ""
+    deep = deep or 0
+    seenTables = seenTables or {}
+
+    if seenTables[t] then
+        resultString = resultString .. "--CIRCULAR REFERENCE\n"
+        return resultString
+    end
+
+    local space = string.rep("   ", deep)
+
+    seenTables[t] = true
+
+    for key, value in pairs(t) do
+		local valueType = type(value)
+
+		if (type(key) == "function") then
+			key = "#function#"
+		elseif (type(key) == "table") then
+			key = "#table#"
+		end
+
+		if (type(key) ~= "string" and type(key) ~= "number") then
+			key = "unknown?"
+		end
+
+        if (valueType == "table") then
+			local sUIObjectType = value.GetObjectType and value:GetObjectType()
+			if (sUIObjectType) then
+				if (type(key) == "number") then
+					resultString = resultString .. space .. "[" .. key .. "] = |cFFa9ffa9 " .. sUIObjectType .. " {|r\n"
+				else
+					resultString = resultString .. space .. "[\"" .. key .. "\"] = |cFFa9ffa9 " .. sUIObjectType .. " {|r\n"
+				end
+			else
+				if (type(key) == "number") then
+					resultString = resultString .. space .. "[" .. key .. "] = |cFFa9ffa9 {|r\n"
+				else
+					resultString = resultString .. space .. "[\"" .. key .. "\"] = |cFFa9ffa9 {|r\n"
+				end
+			end
+            resultString = resultString .. tableToString(value, nil, deep + 1, seenTables)
+            resultString = resultString .. space .. "|cFFa9ffa9},|r\n"
+
+		elseif (valueType == "string") then
+			resultString = resultString .. space .. "[\"" .. key .. "\"] = \"|cFFfff1c1" .. value .. "|r\",\n"
+
+		elseif (valueType == "number") then
+			resultString = resultString .. space .. "[\"" .. key .. "\"] = |cFFffc1f4" .. value .. "|r,\n"
+
+		elseif (valueType == "function") then
+			resultString = resultString .. space .. "[\"" .. key .. "\"] = function()end,\n"
+
+		elseif (valueType == "boolean") then
+			resultString = resultString .. space .. "[\"" .. key .. "\"] = |cFF99d0ff" .. (value and "true" or "false") .. "|r,\n"
+		end
+    end
+
+    return resultString
+end
+
+local function tableToStringSafe(t)
+    local seenTables = {}
+    return tableToString(t, nil, 0, seenTables)
+end
+
 
 ---get the contends of table 't' and return it as a string
 ---@param t table
@@ -607,6 +714,9 @@ end
 ---@param deep integer
 ---@return string
 function DF.table.dump(t, resultString, deep)
+
+	if true then return tableToStringSafe(t) end
+
 	resultString = resultString or ""
 	deep = deep or 0
 	local space = ""
@@ -787,6 +897,7 @@ else
 end
 
 ---format a number with commas
+---@param self table
 ---@param value number
 ---@return string
 function DF:CommaValue(value)
@@ -805,6 +916,7 @@ function DF:CommaValue(value)
 end
 
 ---call the function 'callback' for each group member passing the unitID and the extra arguments
+---@param self table
 ---@param callback function
 ---@vararg any
 function DF:GroupIterator(callback, ...)
@@ -825,6 +937,7 @@ function DF:GroupIterator(callback, ...)
 end
 
 ---get an integer an format it as string with the time format 16:45
+---@param self table
 ---@param value number
 ---@return string
 function DF:IntegerToTimer(value) --~formattime
@@ -832,6 +945,7 @@ function DF:IntegerToTimer(value) --~formattime
 end
 
 ---remove the realm name from a name
+---@param self table
 ---@param name string
 ---@return string, number
 function DF:RemoveRealmName(name)
@@ -839,6 +953,7 @@ function DF:RemoveRealmName(name)
 end
 
 ---remove the owner name of the pet or guardian
+---@param self table
 ---@param name string
 ---@return string, number
 function DF:RemoveOwnerName(name)
@@ -846,6 +961,7 @@ function DF:RemoveOwnerName(name)
 end
 
 ---remove realm and owner names also remove brackets from spell actors
+---@param self table
 ---@param name string
 ---@return string
 function DF:CleanUpName(name)
@@ -856,6 +972,7 @@ function DF:CleanUpName(name)
 end
 
 ---remove the realm name from a name
+---@param self table
 ---@param name string
 ---@return string, number
 function DF:RemoveRealName(name)
@@ -863,6 +980,7 @@ function DF:RemoveRealName(name)
 end
 
 ---get the UIObject of type 'FontString' named fontString and set the font size to the maximum value of the arguments
+---@param self table
 ---@param fontString fontstring
 ---@vararg number
 function DF:SetFontSize(fontString, ...)
@@ -871,6 +989,7 @@ function DF:SetFontSize(fontString, ...)
 end
 
 ---get the UIObject of type 'FontString' named fontString and set the font to the argument fontface
+---@param self table
 ---@param fontString fontstring
 ---@param fontface string
 function DF:SetFontFace(fontString, fontface)
@@ -884,24 +1003,26 @@ function DF:SetFontFace(fontString, fontface)
 end
 
 ---get the FontString passed and set the font color
+---@param self table
 ---@param fontString fontstring
 ---@param r any
----@param g number|nil
----@param b number|nil
----@param a number|nil
+---@param g number?
+---@param b number?
+---@param a number?
 function DF:SetFontColor(fontString, r, g, b, a)
 	r, g, b, a = DF:ParseColors(r, g, b, a)
 	fontString:SetTextColor(r, g, b, a)
 end
 
 ---get the FontString passed and set the font shadow color and offset
+---@param self table
 ---@param fontString fontstring
----@param r number
----@param g number
----@param b number
----@param a number
----@param x number
----@param y number
+---@param r any
+---@param g number?
+---@param b number?
+---@param a number?
+---@param x number?
+---@param y number?
 function DF:SetFontShadow(fontString, r, g, b, a, x, y)
 	r, g, b, a = DF:ParseColors(r, g, b, a)
 	fontString:SetShadowColor(r, g, b, a)
@@ -914,9 +1035,10 @@ function DF:SetFontShadow(fontString, r, g, b, a, x, y)
 end
 
 ---get the FontString object passed and set the rotation of the text shown
+---@param self table
 ---@param fontString fontstring
 ---@param degrees number
-function DF:SetFontRotation(fontString, degrees)
+function DF:SetFontRotation(fontString, degrees) --deprecated, use fontString:SetRotation(degrees)
 	if (type(degrees) == "number") then
 		if (not fontString.__rotationAnimation) then
 			fontString.__rotationAnimation = DF:CreateAnimationHub(fontString)
@@ -931,6 +1053,7 @@ function DF:SetFontRotation(fontString, degrees)
 end
 
 ---receives a string and a color and return the string wrapped with the color using |c and |r scape codes
+---@param self table
 ---@param text string
 ---@param color any
 ---@return string
@@ -948,6 +1071,7 @@ function DF:AddColorToText(text, color) --wrap text with a color
 end
 
 ---receives a string 'text' and a class name and return the string wrapped with the class color using |c and |r scape codes
+---@param self table
 ---@param text string
 ---@param className string
 ---@return string
@@ -970,6 +1094,7 @@ function DF:AddClassColorToText(text, className)
 end
 
 ---create a string with the spell icon and the spell name using |T|t scape codes to add the icon inside the string
+---@param self table
 ---@param spellId any
 ---@return string
 function DF:MakeStringFromSpellId(spellId)
@@ -1376,6 +1501,11 @@ function DF:CheckPoints(point1, point2, point3, point4, point5, object)
 	return point1 or "topleft", point2, point3 or "topleft", point4 or 0, point5 or 0
 end
 
+---@class df_anchor : table
+---@field side number 1-8: topleft to top (clockwise); 9: center; 10-13: inside left right top bottom; 14-17: inside topleft, bottomleft bottomright topright
+---@field x number
+---@field y number
+
 local anchoringFunctions = {
 	function(frame, anchorTo, offSetX, offSetY) --1 TOP LEFT
 		frame:ClearAllPoints()
@@ -1422,30 +1552,54 @@ local anchoringFunctions = {
 		frame:SetPoint("center", anchorTo, "center", offSetX, offSetY)
 	end,
 
-	function(frame, anchorTo, offSetX, offSetY) --10
+	function(frame, anchorTo, offSetX, offSetY) --10 INSIDE LEFT
 		frame:ClearAllPoints()
 		frame:SetPoint("left", anchorTo, "left", offSetX, offSetY)
 	end,
 
-	function(frame, anchorTo, offSetX, offSetY) --11
+	function(frame, anchorTo, offSetX, offSetY) --11 INSIDE RIGHT
 		frame:ClearAllPoints()
 		frame:SetPoint("right", anchorTo, "right", offSetX, offSetY)
 	end,
 
-	function(frame, anchorTo, offSetX, offSetY) --12
+	function(frame, anchorTo, offSetX, offSetY) --12 INSIDE TOP
 		frame:ClearAllPoints()
 		frame:SetPoint("top", anchorTo, "top", offSetX, offSetY)
 	end,
 
-	function(frame, anchorTo, offSetX, offSetY) --13
+	function(frame, anchorTo, offSetX, offSetY) --13 INSIDE BOTTOM
 		frame:ClearAllPoints()
 		frame:SetPoint("bottom", anchorTo, "bottom", offSetX, offSetY)
-	end
+	end,
+
+	function(frame, anchorTo, offSetX, offSetY) --14 INSIDE TOPLEFT to TOPLEFT
+		frame:ClearAllPoints()
+		frame:SetPoint("topleft", anchorTo, "topleft", offSetX, offSetY)
+	end,
+
+	function(frame, anchorTo, offSetX, offSetY) --15 INSIDE BOTTOMLEFT to BOTTOMLEFT
+		frame:ClearAllPoints()
+		frame:SetPoint("bottomleft", anchorTo, "bottomleft", offSetX, offSetY)
+	end,
+
+	function(frame, anchorTo, offSetX, offSetY) --16 INSIDE BOTTOMRIGHT to BOTTOMRIGHT
+		frame:ClearAllPoints()
+		frame:SetPoint("bottomright", anchorTo, "bottomright", offSetX, offSetY)
+	end,
+
+	function(frame, anchorTo, offSetX, offSetY) --17 INSIDE TOPRIGHT to TOPRIGHT
+		frame:ClearAllPoints()
+		frame:SetPoint("topright", anchorTo, "topright", offSetX, offSetY)
+	end,
 }
 
-function DF:SetAnchor(widget, config, anchorTo)
+---set the anchor point using a df_anchor table
+---@param widget uiobject
+---@param anchorTable df_anchor
+---@param anchorTo uiobject
+function DF:SetAnchor(widget, anchorTable, anchorTo)
 	anchorTo = anchorTo or widget:GetParent()
-	anchoringFunctions[config.side](widget, anchorTo, config.x, config.y)
+	anchoringFunctions[anchorTable.side](widget, anchorTo, anchorTable.x, anchorTable.y)
 end
 
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -2637,6 +2791,7 @@ end
 
 				elseif (widgetTable.type == "textentry") then
 					local textentry = DF:CreateTextEntry(parent, widgetTable.func or widgetTable.set, 120, 18, nil, "$parentWidget" .. index, nil, buttonTemplate)
+					textentry.align = widgetTable.align or "left"
 
 					local descPhraseId = getDescripttionPhraseID(widgetTable, languageAddonId, languageTable)
 					DetailsFramework.Language.RegisterTableKeyWithDefault(languageAddonId, textentry, "have_tooltip", descPhraseId, widgetTable.desc)
@@ -3374,6 +3529,11 @@ end
 -----------------------------
 --animations
 
+---create an animation 'hub' which is an animationGroup but with some extra functions
+---@param parent uiobject
+---@param onPlay function?
+---@param onFinished function?
+---@return animationgroup
 function DF:CreateAnimationHub(parent, onPlay, onFinished)
 	local newAnimation = parent:CreateAnimationGroup()
 	newAnimation:SetScript("OnPlay", onPlay)
@@ -3416,6 +3576,38 @@ function DF:CreateAnimation(animation, animationType, order, duration, arg1, arg
 	return anim
 end
 
+---receives an uiobject, when its parent get hover overed, starts the fade in animation
+---start the fade out animation when the mouse leaves the parent
+---@param UIObject uiobject
+---@param fadeInTime number
+---@param fadeOutTime number
+---@param fadeInAlpha number
+---@param fadeOutAlpha number
+function DF:CreateFadeAnimation(UIObject, fadeInTime, fadeOutTime, fadeInAlpha, fadeOutAlpha)
+	fadeInTime = fadeInTime or 0.1
+	fadeOutTime = fadeOutTime or 0.1
+	fadeInAlpha = fadeInAlpha or 1
+	fadeOutAlpha = fadeOutAlpha or 0
+
+	local fadeInAnimationHub = DF:CreateAnimationHub(UIObject, function() UIObject:Show(); UIObject:SetAlpha(fadeOutAlpha) end, function() UIObject:SetAlpha(fadeInAlpha) end)
+	local fadeIn = DF:CreateAnimation(fadeInAnimationHub, "Alpha", 1, fadeInTime, fadeOutAlpha, fadeInAlpha)
+
+	local fadeOutAnimationHub = DF:CreateAnimationHub(UIObject, nil, function() UIObject:Hide(); UIObject:SetAlpha(0) end)
+	local fadeOut = DF:CreateAnimation(fadeOutAnimationHub, "Alpha", 2, fadeOutTime, fadeInAlpha, fadeOutAlpha)
+
+	local scriptFrame
+	--hook the parent OnEnter and OnLeave
+	if (UIObject:IsObjectType("FontString") or UIObject:IsObjectType("Texture")) then
+		scriptFrame = UIObject:GetParent()
+	else
+		scriptFrame = UIObject
+	end
+
+	---@cast scriptFrame frame
+	scriptFrame:HookScript("OnEnter", function() fadeOutAnimationHub:Stop(); fadeInAnimationHub:Play() end)
+	scriptFrame:HookScript("OnLeave", function() fadeInAnimationHub:Stop(); fadeOutAnimationHub:Play() end)
+end
+
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 --frame shakes
 
@@ -3447,7 +3639,6 @@ FrameshakeUpdateFrame:SetScript("OnUpdate", function(self, deltaTime)
 		end
 	end
 end)
-
 
 local frameshake_ShakeFinished = function(parent, shakeObject)
 	if (shakeObject.IsPlaying) then
@@ -3518,7 +3709,6 @@ frameshake_DoUpdate = function(parent, shakeObject, deltaTime)
 		local scaleShake = min(shakeObject.IsFadingIn and (shakeObject.IsFadingInTime / shakeObject.FadeInTime) or 1, shakeObject.IsFadingOut and (1 - shakeObject.IsFadingOutTime / shakeObject.FadeOutTime) or 1)
 
 		if (scaleShake > 0) then
-
 			--delate the time by the frequency on both X and Y offsets
 			shakeObject.XSineOffset = shakeObject.XSineOffset + (deltaTime * shakeObject.Frequency)
 			shakeObject.YSineOffset = shakeObject.YSineOffset + (deltaTime * shakeObject.Frequency)
@@ -3550,12 +3740,9 @@ frameshake_DoUpdate = function(parent, shakeObject, deltaTime)
 
 				elseif (#anchor == 5) then
 					local anchorName1, anchorTo, anchorName2, point1, point2 = unpack(anchor)
-					--parent:ClearAllPoints()
-
 					parent:SetPoint(anchorName1, anchorTo, anchorName2, point1 + newX, point2 + newY)
 				end
 			end
-
 		end
 	else
 		frameshake_ShakeFinished(parent, shakeObject)
@@ -3639,7 +3826,7 @@ local frameshake_play = function(parent, shakeObject, scaleDirection, scaleAmpli
 	frameshake_DoUpdate(parent, shakeObject)
 end
 
-local frameshake_SetConfig = function(parent, shakeObject, duration, amplitude, frequency, absoluteSineX, absoluteSineY, scaleX, scaleY, fadeInTime, fadeOutTime, anchorPoints)
+local frameshake_SetConfig = function(parent, shakeObject, duration, amplitude, frequency, absoluteSineX, absoluteSineY, scaleX, scaleY, fadeInTime, fadeOutTime)
 	shakeObject.Amplitude = amplitude or shakeObject.Amplitude
 	shakeObject.Frequency = frequency or shakeObject.Frequency
 	shakeObject.Duration = duration or shakeObject.Duration
@@ -3663,8 +3850,41 @@ local frameshake_SetConfig = function(parent, shakeObject, duration, amplitude, 
 	shakeObject.OriginalDuration = shakeObject.Duration
 end
 
-function DF:CreateFrameShake(parent, duration, amplitude, frequency, absoluteSineX, absoluteSineY, scaleX, scaleY, fadeInTime, fadeOutTime, anchorPoints)
+---@class frameshake : table
+---@field Amplitude number
+---@field Frequency number
+---@field Duration number
+---@field FadeInTime number
+---@field FadeOutTime number
+---@field ScaleX number
+---@field ScaleY number
+---@field AbsoluteSineX boolean
+---@field AbsoluteSineY boolean
+---@field IsPlaying boolean
+---@field TimeLeft number
+---@field OriginalScaleX number
+---@field OriginalScaleY number
+---@field OriginalFrequency number
+---@field OriginalAmplitude number
+---@field OriginalDuration number
+---@field PlayFrameShake fun(parent:uiobject, shakeObject:frameshake, scaleDirection:number?, scaleAmplitude:number?, scaleFrequency:number?, scaleDuration:number?)
+---@field StopFrameShake fun(parent:uiobject, shakeObject:frameshake)
+---@field SetFrameShakeSettings fun(parent:uiobject, shakeObject:frameshake, duration:number?, amplitude:number?, frequency:number?, absoluteSineX:boolean?, absoluteSineY:boolean?, scaleX:number?, scaleY:number?, fadeInTime:number?, fadeOutTime:number?)
 
+---create a frame shake object
+---@param parent uiobject
+---@param duration number?
+---@param amplitude number?
+---@param frequency number?
+---@param absoluteSineX boolean?
+---@param absoluteSineY boolean?
+---@param scaleX number?
+---@param scaleY number?
+---@param fadeInTime number?
+---@param fadeOutTime number?
+---@param anchorPoints table?
+---@return frameshake
+function DF:CreateFrameShake(parent, duration, amplitude, frequency, absoluteSineX, absoluteSineY, scaleX, scaleY, fadeInTime, fadeOutTime, anchorPoints)
 	--create the shake table
 	local frameShake = {
 		Amplitude = amplitude or 2,
@@ -3721,21 +3941,36 @@ local glow_overlay_play = function(self)
 	if (not self:IsShown()) then
 		self:Show()
 	end
-	if (self.animOut:IsPlaying()) then
-		self.animOut:Stop()
-	end
-	if (not self.animIn:IsPlaying()) then
-		self.animIn:Stop()
-		self.animIn:Play()
+	if (self.animOut) then
+		if (self.animOut:IsPlaying()) then
+			self.animOut:Stop()
+		end
+		if (not self.animIn:IsPlaying()) then
+			self.animIn:Stop()
+			self.animIn:Play()
+		end
+	elseif (self.ProcStartAnim) then
+		if (not self.ProcStartAnim:IsPlaying()) then
+			self.ProcStartAnim:Play()
+		end
+		if (not self.ProcLoop:IsPlaying()) then
+			--self.ProcLoop:Play()
+		end
 	end
 end
 
 local glow_overlay_stop = function(self)
-	if (self.animOut:IsPlaying()) then
-		self.animOut:Stop()
-	end
-	if (self.animIn:IsPlaying()) then
-		self.animIn:Stop()
+	if (self.animOut) then
+		if (self.animOut:IsPlaying()) then
+			self.animOut:Stop()
+		end
+		if (self.animIn:IsPlaying()) then
+			self.animIn:Stop()
+		end
+	elseif (self.ProcStartAnim) then
+		if (self.ProcStartAnim:IsPlaying()) then
+			self.ProcStartAnim:Stop()
+		end
 	end
 	if (self:IsShown()) then
 		self:Hide()
@@ -3745,20 +3980,27 @@ end
 local glow_overlay_setcolor = function(self, antsColor, glowColor)
 	if (antsColor) then
 		local r, g, b, a = DF:ParseColors(antsColor)
-		self.ants:SetVertexColor(r, g, b, a)
-		self.AntsColor.r = r
-		self.AntsColor.g = g
-		self.AntsColor.b = b
-		self.AntsColor.a = a
+		self.AntsColor = {r, g, b, a}
+		if (self.ants) then
+			self.ants:SetVertexColor(r, g, b, a)
+		elseif (self.ProcLoopFlipbook) then
+			self.ProcLoopFlipbook:SetVertexColor(r, g, b) --no alpha because of animation
+			local anim1 = self.ProcLoop:GetAnimations()
+			anim1:SetToAlpha(a)
+		end
 	end
 
 	if (glowColor) then
 		local r, g, b, a = DF:ParseColors(glowColor)
-		self.outerGlow:SetVertexColor(r, g, b, a)
-		self.GlowColor.r = r
-		self.GlowColor.g = g
-		self.GlowColor.b = b
-		self.GlowColor.a = a
+		self.GlowColor = {r, g, b, a}
+		if (self.outerGlow) then
+			self.outerGlow:SetVertexColor(r, g, b, a)
+		elseif (self.ProcStartFlipbook) then
+			self.ProcStartFlipbook:SetVertexColor(r, g, b) --no alpha because of animation
+			local anim1, anim2, anim3 = self.ProcStartAnim:GetAnimations()
+			anim1:SetToAlpha(a)
+			anim3:SetFromAlpha(a)
+		end
 	end
 end
 
@@ -3785,6 +4027,8 @@ function DF:CreateGlowOverlay (parent, antsColor, glowColor)
 	glowFrame.Stop = glow_overlay_stop
 	glowFrame.SetColor = glow_overlay_setcolor
 
+	glowFrame:SetColor(antsColor, glowColor)
+
 	glowFrame:Hide()
 
 	parent.overlay = glowFrame
@@ -3797,15 +4041,17 @@ function DF:CreateGlowOverlay (parent, antsColor, glowColor)
 	parent.overlay:SetPoint("TOPLEFT", parent, "TOPLEFT", -frameWidth * 0.32, frameHeight * 0.36)
 	parent.overlay:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", frameWidth * 0.32, -frameHeight * 0.36)
 
-	local r, g, b, a = DF:ParseColors(antsColor)
-	glowFrame.ants:SetVertexColor(r, g, b, a)
-	glowFrame.AntsColor = {r, g, b, a}
-
-	local r, g, b, a = DF:ParseColors(glowColor)
-	glowFrame.outerGlow:SetVertexColor(r, g, b, a)
-	glowFrame.GlowColor = {r, g, b, a}
-
-	glowFrame.outerGlow:SetScale(1.2)
+	if (glowFrame.outerGlow) then
+		glowFrame.outerGlow:SetScale(1.2)
+	end
+	if (glowFrame.ProcStartFlipbook) then
+		glowFrame.ProcStartAnim:Stop()
+		glowFrame.ProcStartFlipbook:ClearAllPoints()
+		--glowFrame.ProcStartFlipbook:SetAllPoints()
+		--glowFrame.ProcStartFlipbook:SetSize(frameWidth * scale, frameHeight * scale)
+		glowFrame.ProcStartFlipbook:SetPoint("TOPLEFT", glowFrame, "TOPLEFT", -frameWidth * scale, frameHeight * scale)
+		glowFrame.ProcStartFlipbook:SetPoint("BOTTOMRIGHT", glowFrame, "BOTTOMRIGHT", frameWidth * scale, -frameHeight * scale)
+	end
 	glowFrame:EnableMouse(false)
 	return glowFrame
 end
@@ -4412,19 +4658,22 @@ end
 ---@return any
 function DF:Dispatch(func, ...)
 	if (type(func) ~= "function") then
-		return dispatch_error (_, "DF:Dispatch expect a function as parameter 1.")
+		return dispatch_error(_, "DetailsFramework:Dispatch(func) expect a function as parameter 1.")
 	end
+	return select(2, xpcall(func, geterrorhandler(), ...))
 
-	local dispatchResult = {xpcall(func, geterrorhandler(), ...)}
-	local okay = dispatchResult[1]
+	--[=[
+		local dispatchResult = {xpcall(func, geterrorhandler(), ...)}
+		local okay = dispatchResult[1]
 
-	if (not okay) then
-		return false
-	end
+		if (not okay) then
+			return false
+		end
 
-	tremove(dispatchResult, 1)
+		tremove(dispatchResult, 1)
 
-	return unpack(dispatchResult)
+		return unpack(dispatchResult)
+	--]=]
 end
 
 --[=[
