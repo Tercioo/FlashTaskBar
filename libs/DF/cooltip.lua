@@ -15,9 +15,20 @@ local wipe = table.wipe
 local insert = table.insert
 local max = math.max
 
+local GetSpellInfo = GetSpellInfo or function(spellID) if not spellID then return nil end local si = C_Spell.GetSpellInfo(spellID) if si then return si.name, nil, si.iconID, si.castTime, si.minRange, si.maxRange, si.spellID, si.originalIconID end end
+local SPELLBOOK_BANK_PLAYER = Enum.SpellBookSpellBank and Enum.SpellBookSpellBank.Player or "player"
+local IsPassiveSpell = IsPassiveSpell or C_Spell.IsSpellPassive
+
+local GetSpellCharges = GetSpellCharges or function(spellId)
+    local chargesInfo = C_Spell.GetSpellCharges(spellId)
+    if (chargesInfo) then
+        return chargesInfo.currentCharges, chargesInfo.maxCharges, chargesInfo.cooldownStartTime, chargesInfo.cooldownDuration, chargesInfo.chargeModRate
+    end
+end
+
 --api locals
 local PixelUtil = PixelUtil or DFPixelUtil
-local version = 24
+local version = 26
 
 local CONST_MENU_TYPE_MAINMENU = "main"
 local CONST_MENU_TYPE_SUBMENU = "sub"
@@ -333,6 +344,13 @@ function DF:CreateCoolTip()
 			self.titleText:SetJustifyH("LEFT")
 			DF:SetFontSize(self.titleText, 10)
 			self.titleText:SetPoint("CENTER", self.titleIcon, "CENTER", 0, 6)
+		end
+
+		if (not self.modelFrame) then
+			self.modelFrame = CreateFrame("PlayerModel", "$parent_ModelFrame", self)
+			self.modelFrame:SetPoint("topleft", self, "topleft", 5, -5)
+			self.modelFrame:SetPoint("bottomright", self, "bottomright", -5, 5)
+			self.modelFrame:Hide()
 		end
 	end
 
@@ -1945,7 +1963,7 @@ function DF:CreateCoolTip()
 				local spellDescription = GetSpellDescription(spellId)
 				local cooldownTime, globalCooldown = GetSpellBaseCooldown(spellId)
 				--local cooldown = cooldownTime / 1000
-				local bIsPassive = IsPassiveSpell(spellId, "player")
+				local bIsPassive = IsPassiveSpell(spellId, SPELLBOOK_BANK_PLAYER)
 				local chargesAvailable, maxCharges, chargeCooldownStart, rechargeTime, chargeModRate = GetSpellCharges(spellId)
 
 				local tResourceCost = GetSpellPowerCost(spellId)
@@ -2755,6 +2773,9 @@ function DF:CreateCoolTip()
 		gameCooltip.Banner[2] = false
 		gameCooltip.Banner[3] = false
 
+		frame1.modelFrame:Hide()
+		frame2.modelFrame:Hide()
+
 		frame1.upperImage:Hide()
 		frame1.upperImage2:Hide()
 		frame1.upperImageText:Hide()
@@ -3039,6 +3060,19 @@ function DF:CreateCoolTip()
 
 	frame1.frameWallpaper:Hide()
 	frame2.frameWallpaper:Hide()
+
+	function gameCooltip:SetNpcModel(menuType, npcId)
+		menuType = gameCooltip:ParseMenuType(menuType)
+
+		if (menuType == CONST_MENU_TYPE_MAINMENU) then
+			frame1.modelFrame:Show()
+			frame1.modelFrame:SetCreature(npcId)
+
+		elseif (menuType == CONST_MENU_TYPE_SUBMENU) then
+			frame2.modelFrame:Show()
+			frame2.modelFrame:SetCreature(npcId)
+		end
+	end
 
 	---set an image as wallpaper for the cooltip frame
 	---@param menuType any

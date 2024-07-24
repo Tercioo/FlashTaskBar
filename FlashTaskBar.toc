@@ -1,4 +1,4 @@
-## Interface: 100206
+## Interface: 110000
 ## Title: Flash Task Bar
 ## Notes: Flashes the taskbar when you are alt-tabbed and queue for raid finder, battleground pops up.
 ## SavedVariables: FlashTaskbarDB
