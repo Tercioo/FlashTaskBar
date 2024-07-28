@@ -1,10 +1,11 @@
 
+---@type detailsframework
 local DF = _G ["DetailsFramework"]
 if (not DF) then
 	print ("|cFFFFAA00FlashTaskBar: framework not found, if you just installed or updated the addon, please restart your client.|r")
 	return
 end
- 
+
 local _
 
 local L = LibStub ("AceLocale-3.0"):GetLocale ("FlashTaskbarLocales", true)
@@ -108,7 +109,7 @@ function FlashTaskBar:DoFlash (config_key)
 		if (FlashDebug) then
 			FlashTaskBar:Msg ("Flash Reason: " .. (config_key or "unknown"))
 		end
-	
+
 		FlashClientIcon()
 		local has_sound = FlashTaskBar.db.profile.sound_enabled
 		if (has_sound and has_sound [config_key] and has_sound [config_key].enabled) then
@@ -124,17 +125,17 @@ function FlashTaskBar.OnInit (self)
 	--register slash
 	SLASH_FLASHTASKBAR1 = "/flashtaskbar"
 	function SlashCmdList.FLASHTASKBAR (msg, editbox)
-	
+
 		if (msg == "reason") then
 			FlashDebug = not FlashDebug
 			FlashTaskBar:Msg ("Flash Reason " .. (FlashDebug and "Enabled" or "Disabled"))
 			return
 		end
-	
+
 		InterfaceOptionsFrame_OpenToCategory ("FlashTaskBar")
 		InterfaceOptionsFrame_OpenToCategory ("FlashTaskBar")
 	end
-	
+
 	--invite
 	function FlashTaskBar:DelayInviteCheck()
 		--if already in a group, ignore the invite call
@@ -146,14 +147,14 @@ function FlashTaskBar.OnInit (self)
 			FlashTaskBar:DoFlash("invite")
 		end
 	end
-	
+
 	--> wait 2 seconds before flash, other addons may auto answer the group invite
 	function FlashTaskBar:CheckForGroupInvite()
 		if (StaticPopup1 and StaticPopup1:IsShown()) then
 			FlashTaskBar:DoFlash("invite")
 		end
 	end
-	
+
 	function FlashTaskBar:PARTY_INVITE_REQUEST()
 		if (FlashTaskBar.db.profile.invite) then
 			if (FlashTaskBar.db.profile.invite_ignore_on_autoaccept) then
@@ -164,7 +165,7 @@ function FlashTaskBar.OnInit (self)
 		end
 	end
 	FlashTaskBar:RegisterEvent ("PARTY_INVITE_REQUEST")
-	
+
 	--pet battle queue
 	function FlashTaskBar:CheckPetBattleQueue()
 		if (PetBattleQueueReadyFrame and PetBattleQueueReadyFrame:IsShown()) then
@@ -195,7 +196,7 @@ function FlashTaskBar.OnInit (self)
 				FlashTaskBar.last_flash = 0
 			end
 		end)
-	
+
 		--lfg lfpvp windows
 		hooksecurefunc ("LFGDungeonReadyStatus_ResetReadyStates", function()
 			if (FlashTaskBar.db.profile.group_queue) then
@@ -211,27 +212,27 @@ function FlashTaskBar.OnInit (self)
 			end
 		end)
 	end
-	
+
 	--general alerts
 	hooksecurefunc ("StaticPopup_Show", function (token, text_arg1, text_arg2, data, insertedFrame)
 		if (token == "BFMGR_INVITED_TO_ENTER") then --> generic world pvp alert
 			if (FlashTaskBar.db.profile.worldpvp) then
 				FlashTaskBar:DoFlash("worldpvp")
 			end
-		
+
 		elseif (token == "DUEL_REQUESTED" or token == "PET_BATTLE_PVP_DUEL_REQUESTED") then
 			if (FlashTaskBar.db.profile.duel_request) then
 				FlashTaskBar:DoFlash("duel_request")
 			end
-		
+
 		elseif (token == "CONFIRM_SUMMON" or token == "CONFIRM_SUMMON_STARTING_AREA") then
 			if (FlashTaskBar.db.profile.summon) then
 				FlashTaskBar:DoFlash("summon")
 			end
-		
+
 		elseif (token == "CHANNEL_INVITE" or token == "CHAT_CHANNEL_INVITE") then
 			FlashTaskBar:DoFlash("chat_channel_invite")
-		
+
 		elseif (token == "PARTY_INVITE" or token == "PARTY_INVITE_XREALM") then
 			if (not FlashTaskBar.db.profile.invite) then
 				return
@@ -241,15 +242,15 @@ function FlashTaskBar.OnInit (self)
 			else
 				FlashTaskBar:DoFlash("invite")
 			end
-		
+
 		elseif (token == "TRADE_WITH_QUESTION") then
 			if (FlashTaskBar.db.profile.trade) then
 				FlashTaskBar:DoFlash("trade")
 			end
 		end
-		
+
 	end)
-	
+
 	--brawlers guild
 	function FlashTaskBar:CHAT_MSG_MONSTER_YELL (event, msg, source, _, _, player_name)
 		if (player_name == UnitName ("player")) then
@@ -310,7 +311,7 @@ function FlashTaskBar.OnInit (self)
 		end
 	end
 	FlashTaskBar:RegisterEvent ("READY_CHECK")
-	
+
 	--combat
 	function FlashTaskBar:PLAYER_REGEN_DISABLED()
 		if (FlashTaskBar.db.profile.enter_combat) then
@@ -318,7 +319,7 @@ function FlashTaskBar.OnInit (self)
 		end
 	end
 	FlashTaskBar:RegisterEvent ("PLAYER_REGEN_DISABLED")
-	
+
 	--taxi
 	--after a true for UnitOnTaxi, wait until it is false again
 	local CheckIfFlyingEnded = function (tickObject)
@@ -328,7 +329,7 @@ function FlashTaskBar.OnInit (self)
 			FlashTaskBar:Msg (L["STRING_CHAT_FLYPOINTENDED"])
 		end
 	end
-	
+
 	--after closing, check if the player is on a taxi
 	local CheckIfIsFlying = function (tickObject)
 		if (UnitOnTaxi ("player")) then
@@ -339,7 +340,7 @@ function FlashTaskBar.OnInit (self)
 			tickObject:Cancel()
 		end
 	end
-	
+
 	--run when the player closes the taxi map
 	function FlashTaskBar:TAXIMAP_CLOSED()
 		if (FlashTaskBar.db.profile.end_taxi) then
@@ -350,21 +351,25 @@ function FlashTaskBar.OnInit (self)
 		end
 	end
 	FlashTaskBar:RegisterEvent ("TAXIMAP_CLOSED")
-	
+
 	--disconenct
-	GameMenuButtonLogout:HookScript ("OnClick", function() 
-		FlashTaskBar.LogoutTolerance = GetTime()+30
-	end)
-	function FlashTaskBar:PLAYER_LOGOUT()
-		if (FlashTaskBar.db.profile.disconnect_logout) then
-			if (FlashTaskBar.LogoutTolerance and FlashTaskBar.LogoutTolerance > GetTime()) then
-				return
+	--don't run this line on wow 11
+	if (DF.IsDragonflightOrBelow()) then
+		GameMenuButtonLogout:HookScript ("OnClick", function()
+			FlashTaskBar.LogoutTolerance = GetTime()+30
+		end)
+
+		function FlashTaskBar:PLAYER_LOGOUT()
+			if (FlashTaskBar.db.profile.disconnect_logout) then
+				if (FlashTaskBar.LogoutTolerance and FlashTaskBar.LogoutTolerance > GetTime()) then
+					return
+				end
+				FlashTaskBar:DoFlash("disconnect_logout")
 			end
-			FlashTaskBar:DoFlash("disconnect_logout")
 		end
+		FlashTaskBar:RegisterEvent ("PLAYER_LOGOUT")
 	end
-	FlashTaskBar:RegisterEvent ("PLAYER_LOGOUT")
-	
+
 	--trade
 	function FlashTaskBar:TRADE_SHOW()
 		if (FlashTaskBar.db.profile.trade) then
@@ -373,7 +378,7 @@ function FlashTaskBar.OnInit (self)
 		end
 	end
 	FlashTaskBar:RegisterEvent ("TRADE_SHOW")
-	
+
 	--bags full
 	function FlashTaskBar:BAG_UPDATE()
 		if (FlashTaskBar.db.profile.bags_full) then
@@ -389,7 +394,7 @@ function FlashTaskBar.OnInit (self)
 		end
 	end
 	FlashTaskBar:RegisterEvent ("BAG_UPDATE")
-	
+
 	--fatigue
 	function FlashTaskBar:MIRROR_TIMER_START (event, name, value, maxvalue, step, pause, label)
 		if (FlashTaskBar.db.profile.fatigue) then
@@ -407,7 +412,7 @@ function FlashTaskBar.OnInit (self)
 		end
 	end
 	FlashTaskBar:RegisterEvent ("START_TIMER")
-	
+
 	--low health
 	FlashTaskBar.LastHealthBlink = time() - 30
 	function FlashTaskBar.CheckTargetHealth()
@@ -452,9 +457,9 @@ function FlashTaskBar.OnInit (self)
 	if (FlashTaskBar.db.profile.lost_health) then
 		FlashTaskBar:EnableCheckHealth (true)
 	end
-	
+
 --------> chat scan
-	
+
 	local player_name = lower (UnitName ("player"))
 	local do_chat_scan = function (_, message)
 		message = lower (message)
@@ -467,7 +472,7 @@ function FlashTaskBar.OnInit (self)
 				end
 			end
 		end
-		
+
 		if (FlashTaskBar.db.profile.on_chat_player_name) then
 			if (message:find (player_name)) then
 				FlashTaskBar:Msg ("somebody mentioned your name in the chat!")
@@ -475,7 +480,7 @@ function FlashTaskBar.OnInit (self)
 			end
 		end
 	end
-	
+
 	function FlashTaskBar:EnableChatScan()
 		FlashTaskBar:RegisterEvent ("CHAT_MSG_EMOTE", do_chat_scan)
 		--FlashTaskBar:RegisterEvent ("CHAT_MSG_MONSTER_EMOTE", do_chat_scan)
@@ -496,10 +501,10 @@ function FlashTaskBar.OnInit (self)
 		FlashTaskBar:RegisterEvent ("CHAT_MSG_RAID", do_chat_scan)
 		FlashTaskBar:RegisterEvent ("CHAT_MSG_RAID_LEADER", do_chat_scan)
 		FlashTaskBar:RegisterEvent ("CHAT_MSG_RAID_WARNING", do_chat_scan)
-		
+
 		player_name = lower (UnitName ("player"))
-	end	
-	
+	end
+
 	function FlashTaskBar:DisableChatScan()
 		FlashTaskBar:UnregisterEvent ("CHAT_MSG_EMOTE")
 		FlashTaskBar:UnregisterEvent ("CHAT_MSG_MONSTER_EMOTE")
@@ -521,7 +526,7 @@ function FlashTaskBar.OnInit (self)
 		FlashTaskBar:UnregisterEvent ("CHAT_MSG_RAID_LEADER")
 		FlashTaskBar:UnregisterEvent ("CHAT_MSG_RAID_WARNING")
 	end
-	
+
 	--> player died
 	local healthFrame = CreateFrame ("frame", nil, UIParent)
 	healthFrame:SetScript ("OnEvent", function (self, unit)
@@ -532,15 +537,15 @@ function FlashTaskBar.OnInit (self)
 			end
 		end
 	end)
-	
+
 	function FlashTaskBar:EnablePlayerHealthMonitor()
 		healthFrame:RegisterUnitEvent ("UNIT_HEALTH", "player")
 	end
-	
+
 	function FlashTaskBar:DisablePlayerHealthMonitor()
 		healthFrame:UnregisterEvent ("UNIT_HEALTH", "player")
 	end
-	
+
 	if (FlashTaskBar.db.profile.player_died) then
 		FlashTaskBar:EnablePlayerHealthMonitor()
 	end
@@ -549,17 +554,17 @@ function FlashTaskBar.OnInit (self)
 	function FlashTaskBar:DoNotFlashOnWhisper()
 		--_G.ChatFrame_MessageEventHandler = ChatFrame_MessageEventHandler_WithNoFlash
 	end
-	
+
 	function FlashTaskBar:EnableFlashOnWhisper()
 		--_G.ChatFrame_MessageEventHandler = ChatFrame_MessageEventHandler_Original
-	end 
-	
+	end
+
 	if (FlashTaskBar.db.profile.whisper_blink) then
 		--FlashTaskBar:EnableFlashOnWhisper()
 	else
 		--FlashTaskBar:DoNotFlashOnWhisper()
 	end
-	
+
 --------> combat log scan
 
 	local combat_log_keywords = {}
@@ -569,30 +574,30 @@ function FlashTaskBar.OnInit (self)
 			FlashTaskBar:DoFlash("combat_log")
 		end
 	end
-	
+
 	function FlashTaskBar:BuildCombatLogKeywordTable()
 		wipe (combat_log_keywords)
 		for _, keyword in ipairs (FlashTaskBar.db.profile.combat_log_keywords) do
 			combat_log_keywords [lower (keyword)] = true
 		end
 	end
-	
+
 	function FlashTaskBar:EnableCombatLogScan()
 		FlashTaskBar:RegisterEvent ("COMBAT_LOG_EVENT_UNFILTERED", do_combat_log_scan)
 		FlashTaskBar:BuildCombatLogKeywordTable()
 	end
-	
+
 	function FlashTaskBar:DisableCombatLogScan()
 		FlashTaskBar:UnregisterEvent ("COMBAT_LOG_EVENT_UNFILTERED")
 	end
-	
+
 --------> rare mob scan
 
 	--> store the timers for flash for each rare
 	FlashTaskBar.RareFlashCooldown = {}
-	
+
 	local do_rare_mob_scan = function()
-	
+
 		--/dump C_VignetteInfo.GetVignetteInfo (C_VignetteInfo.GetVignettes()[1])
 		--/dump C_VignetteInfo.GetVignettes()
 
@@ -600,14 +605,14 @@ function FlashTaskBar.OnInit (self)
 		--[=[]]
 			for i, vignetteID in ipairs (C_VignetteInfo.GetVignettes()) do
 				local vignetteInfo = C_VignetteInfo.GetVignetteInfo (vignetteID)
-				
+
 				if (vignetteInfo) then
 					local serial = vignetteInfo.objectGUID
-		
+
 					if (serial) then
 						local name = vignetteInfo.name
 						local objectIcon = vignetteInfo.atlasName
-						
+
 						--naga event
 						if (objectIcon == "nazjatar-nagaevent") then
 							WorldQuestTracker.NagaEventCooldown = WorldQuestTracker.NagaEventCooldown or 0
@@ -642,7 +647,7 @@ function FlashTaskBar.OnInit (self)
 							FlashTaskBar.RareFlashCooldown [objectGUID] = time() + 180
 						end
 					end
-				
+
 				elseif (vignetteInfo.name) then
 					for _, npcName in ipairs(FlashTaskBar.db.profile.rare_names) do
 						npcName = lower(npcName)
@@ -658,19 +663,19 @@ function FlashTaskBar.OnInit (self)
 			end
 		end
 	end
-	
+
 	function FlashTaskBar:EnableRareMobScan()
 		if (not DetailsFramework.IsTimewalkWoW()) then
 			FlashTaskBar:RegisterEvent ("VIGNETTES_UPDATED", do_rare_mob_scan)
 		end
 	end
-	
+
 	function FlashTaskBar:DisableRareMobScan()
 		if (not DetailsFramework.IsTimewalkWoW()) then
 			FlashTaskBar:UnregisterEvent ("VIGNETTES_UPDATED")
 		end
 	end
- 
+
 --> overrides
 	--replace the built-in flash function from the game client to flash when the player enters in combat
 	if (LowHealthFrame) then
@@ -686,7 +691,7 @@ function FlashTaskBar.OnInit (self)
 	end
 
 --> build options panel
-	
+
 	local options = {
 		{
 			type = "toggle",
@@ -694,7 +699,7 @@ function FlashTaskBar.OnInit (self)
 			desc = L["STRING_READYCHECK_DESC"],
 			order = 1,
 			get = function() return FlashTaskBar.db.profile.readycheck end,
-			set = function (self, val) 
+			set = function (self, val)
 				FlashTaskBar.db.profile.readycheck = not FlashTaskBar.db.profile.readycheck
 			end,
 		},
@@ -704,7 +709,7 @@ function FlashTaskBar.OnInit (self)
 			desc = L["STRING_PVPQUEUES_DESC"],
 			order = 2,
 			get = function() return FlashTaskBar.db.profile.arena_queue end,
-			set = function (self, val) 
+			set = function (self, val)
 				FlashTaskBar.db.profile.arena_queue = not FlashTaskBar.db.profile.arena_queue
 			end,
 		},
@@ -714,7 +719,7 @@ function FlashTaskBar.OnInit (self)
 			desc = L["STRING_FINDERQUEUES_DESC"],
 			order = 3,
 			get = function() return FlashTaskBar.db.profile.group_queue end,
-			set = function (self, val) 
+			set = function (self, val)
 				FlashTaskBar.db.profile.group_queue = not FlashTaskBar.db.profile.group_queue
 			end,
 		},
@@ -724,7 +729,7 @@ function FlashTaskBar.OnInit (self)
 			desc = L["STRING_PETBATTLES_DESC"] ,
 			order = 6,
 			get = function() return FlashTaskBar.db.profile.petbattle_queue end,
-			set = function (self, val) 
+			set = function (self, val)
 				FlashTaskBar.db.profile.petbattle_queue = not FlashTaskBar.db.profile.petbattle_queue
 			end,
 		},
@@ -734,17 +739,17 @@ function FlashTaskBar.OnInit (self)
 			desc = L["STRING_BRAWLERS_DESC"],
 			order = 6,
 			get = function() return FlashTaskBar.db.profile.brawlers_queue end,
-			set = function (self, val) 
+			set = function (self, val)
 				FlashTaskBar.db.profile.brawlers_queue = not FlashTaskBar.db.profile.brawlers_queue
 			end,
-		},		
+		},
 		{
 			type = "toggle",
 			name = L["STRING_PULL"],
 			desc = L["STRING_PULL_DESC"],
 			order = 4,
 			get = function() return FlashTaskBar.db.profile.pull_timers end,
-			set = function (self, val) 
+			set = function (self, val)
 				FlashTaskBar.db.profile.pull_timers = not FlashTaskBar.db.profile.pull_timers
 			end,
 		},
@@ -754,7 +759,7 @@ function FlashTaskBar.OnInit (self)
 			desc = L["STRING_ENTERCOMBAT_DESC"],
 			order = 5,
 			get = function() return FlashTaskBar.db.profile.enter_combat end,
-			set = function (self, val) 
+			set = function (self, val)
 				FlashTaskBar.db.profile.enter_combat = not FlashTaskBar.db.profile.enter_combat
 			end,
 		},
@@ -764,7 +769,7 @@ function FlashTaskBar.OnInit (self)
 			desc = L["STRING_FLYPOINT_DESC"],
 			order = 6,
 			get = function() return FlashTaskBar.db.profile.end_taxi end,
-			set = function (self, val) 
+			set = function (self, val)
 				FlashTaskBar.db.profile.end_taxi = not FlashTaskBar.db.profile.end_taxi
 			end,
 		},
@@ -774,39 +779,39 @@ function FlashTaskBar.OnInit (self)
 			desc = L["STRING_DISCONNECT_DESC"],
 			order = 6,
 			get = function() return FlashTaskBar.db.profile.disconnect_logout end,
-			set = function (self, val) 
+			set = function (self, val)
 				FlashTaskBar.db.profile.disconnect_logout = not FlashTaskBar.db.profile.disconnect_logout
 			end,
 		},
-		
+
 		{
 			type = "toggle",
 			name = L["STRING_INVITES"],
 			desc = L["STRING_INVITES_DESC"],
 			order = 6,
 			get = function() return FlashTaskBar.db.profile.invite end,
-			set = function (self, val) 
+			set = function (self, val)
 				FlashTaskBar.db.profile.invite = not FlashTaskBar.db.profile.invite
 			end,
-		},		
+		},
 		{
 			type = "toggle",
 			name = L["STRING_INVITEIGNORE"],
 			desc = L["STRING_INVITEIGNORE_DESC"],
 			order = 6,
 			get = function() return FlashTaskBar.db.profile.invite_ignore_on_autoaccept end,
-			set = function (self, val) 
+			set = function (self, val)
 				FlashTaskBar.db.profile.invite_ignore_on_autoaccept = not FlashTaskBar.db.profile.invite_ignore_on_autoaccept
 			end,
 		},
-		
+
 		{
 			type = "toggle",
 			name = L["STRING_TRADE"],
 			desc = L["STRING_TRADE_DESC"],
 			order = 6,
 			get = function() return FlashTaskBar.db.profile.trade end,
-			set = function (self, val) 
+			set = function (self, val)
 				FlashTaskBar.db.profile.trade = not FlashTaskBar.db.profile.trade
 			end,
 		},
@@ -816,7 +821,7 @@ function FlashTaskBar.OnInit (self)
 			desc = L["STRING_BAGSFULL_DESC"],
 			order = 6,
 			get = function() return FlashTaskBar.db.profile.bags_full end,
-			set = function (self, val) 
+			set = function (self, val)
 				FlashTaskBar.db.profile.bags_full = not FlashTaskBar.db.profile.bags_full
 			end,
 		},
@@ -826,7 +831,7 @@ function FlashTaskBar.OnInit (self)
 			desc = L["STRING_WORLDPVP_DESC"],
 			order = 6,
 			get = function() return FlashTaskBar.db.profile.worldpvp end,
-			set = function (self, val) 
+			set = function (self, val)
 				FlashTaskBar.db.profile.worldpvp = not FlashTaskBar.db.profile.worldpvp
 			end,
 		},
@@ -836,17 +841,17 @@ function FlashTaskBar.OnInit (self)
 			desc = L["STRING_DUELREQUEST_DESC"] ,
 			order = 6,
 			get = function() return FlashTaskBar.db.profile.duel_request end,
-			set = function (self, val) 
+			set = function (self, val)
 				FlashTaskBar.db.profile.duel_request = not FlashTaskBar.db.profile.duel_request
 			end,
-		},		
+		},
 		{
 			type = "toggle",
 			name = L["STRING_SUMMON"],
 			desc = L["STRING_SUMMON_DESC"],
 			order = 6,
 			get = function() return FlashTaskBar.db.profile.summon end,
-			set = function (self, val) 
+			set = function (self, val)
 				FlashTaskBar.db.profile.summon = not FlashTaskBar.db.profile.summon
 			end,
 		},
@@ -856,7 +861,7 @@ function FlashTaskBar.OnInit (self)
 			desc = L["STRING_FATIGUE_DESC"],
 			order = 6,
 			get = function() return FlashTaskBar.db.profile.fatigue end,
-			set = function (self, val) 
+			set = function (self, val)
 				FlashTaskBar.db.profile.fatigue = not FlashTaskBar.db.profile.fatigue
 			end,
 		},
@@ -866,7 +871,7 @@ function FlashTaskBar.OnInit (self)
 			desc = L["STRING_PLAYERNAME_DESC"],
 			order = 6,
 			get = function() return FlashTaskBar.db.profile.on_chat_player_name end,
-			set = function (self, val) 
+			set = function (self, val)
 				FlashTaskBar.db.profile.on_chat_player_name = not FlashTaskBar.db.profile.on_chat_player_name
 				if (FlashTaskBar.db.profile.on_chat_player_name) then
 					FlashTaskBar:EnableChatScan()
@@ -878,7 +883,7 @@ function FlashTaskBar.OnInit (self)
 				end
 			end,
 		},
-		
+
 		--[=[
 		{
 			type = "toggle",
@@ -886,7 +891,7 @@ function FlashTaskBar.OnInit (self)
 			desc = L["STRING_ONWHISPER_DESC"],
 			order = 6,
 			get = function() return FlashTaskBar.db.profile.whisper_blink end,
-			set = function (self, val) 
+			set = function (self, val)
 				FlashTaskBar.db.profile.whisper_blink = not FlashTaskBar.db.profile.whisper_blink
 				if (FlashTaskBar.db.profile.whisper_blink) then
 					FlashTaskBar:EnableFlashOnWhisper()
@@ -896,36 +901,36 @@ function FlashTaskBar.OnInit (self)
 			end,
 		},
 		--]=]
-		
+
 		{
 			type = "toggle",
 			name = L["STRING_BATTLEGROUND"],
 			desc = L["STRING_BATTLEGROUND_DESC"],
 			order = 6,
 			get = function() return FlashTaskBar.db.profile.battleground_end end,
-			set = function (self, val) 
+			set = function (self, val)
 				FlashTaskBar.db.profile.battleground_end = not FlashTaskBar.db.profile.battleground_end
 			end,
 		},
-		
+
 		{
 			type = "toggle",
 			name = L["STRING_ONCOUNTDOWN"],
 			desc = L["STRING_ONCOUNTDOWN_DESC"],
 			order = 6,
 			get = function() return FlashTaskBar.db.profile.timer_start end,
-			set = function (self, val) 
+			set = function (self, val)
 				FlashTaskBar.db.profile.timer_start = not FlashTaskBar.db.profile.timer_start
 			end,
 		},
-		
+
 		{
 			type = "toggle",
 			name = L["STRING_TARGETLOWHEALTH"],
 			desc = L["STRING_TARGETLOWHEALTH_DESC"],
 			order = 6,
 			get = function() return FlashTaskBar.db.profile.low_health end,
-			set = function (self, val) 
+			set = function (self, val)
 				FlashTaskBar.db.profile.low_health = not FlashTaskBar.db.profile.low_health
 				if (FlashTaskBar.db.profile.low_health) then
 					FlashTaskBar:EnableCheckHealth (true)
@@ -941,7 +946,7 @@ function FlashTaskBar.OnInit (self)
 			desc = L["STRING_TARGETLOSTHEALTH_DESC"],
 			order = 6,
 			get = function() return FlashTaskBar.db.profile.lost_health end,
-			set = function (self, val) 
+			set = function (self, val)
 				FlashTaskBar.db.profile.lost_health = not FlashTaskBar.db.profile.lost_health
 				if (FlashTaskBar.db.profile.lost_health) then
 					FlashTaskBar:EnableCheckHealth (true)
@@ -950,14 +955,14 @@ function FlashTaskBar.OnInit (self)
 				end
 			end,
 		},
-		
+
 		{
 			type = "toggle",
 			name = L["STRING_ONPLAYERDEATH"],
 			desc = L["STRING_ONPLAYERDEATH_DESC"],
 			order = 6,
 			get = function() return FlashTaskBar.db.profile.player_died end,
-			set = function (self, val) 
+			set = function (self, val)
 				FlashTaskBar.db.profile.player_died = not FlashTaskBar.db.profile.player_died
 				if (FlashTaskBar.db.profile.player_died) then
 					FlashTaskBar:EnablePlayerHealthMonitor()
@@ -977,40 +982,40 @@ function FlashTaskBar.OnInit (self)
 				FlashTaskBar.db.profile.chromie_chest = not FlashTaskBar.db.profile.chromie_chest
 			end,
 		},
-		
+
 	}
-	
+
 	local options_text_template = FlashTaskBar:GetTemplate ("font", "OPTIONS_FONT_TEMPLATE")
 	local options_dropdown_template = FlashTaskBar:GetTemplate ("dropdown", "OPTIONS_DROPDOWN_TEMPLATE")
 	local options_switch_template = FlashTaskBar:GetTemplate ("switch", "OPTIONS_CHECKBOX_TEMPLATE")
 	local options_slider_template = FlashTaskBar:GetTemplate ("slider", "OPTIONS_SLIDER_TEMPLATE")
 	local options_button_template = FlashTaskBar:GetTemplate ("button", "OPTIONS_BUTTON_TEMPLATE")
-	
+
 	local general_text1 = FlashTaskBar:CreateLabel (FlashTaskBar.OptionsFrame1, L["STRING_GENERALSETTINGS"] .. ":", FlashTaskBar:GetTemplate ("font", "ORANGE_FONT_TEMPLATE"))
 	general_text1:SetPoint ("topleft", main_frame, "topleft", 10, -50)
 	FlashTaskBar:SetFontSize (general_text1, 16)
-	
+
 	local general_settings_frame = CreateFrame ("frame", "FlashTaskBarGeneralOptionsFrame", FlashTaskBar.OptionsFrame1)
 	general_settings_frame:SetPoint ("topleft", 0, 0)
 	general_settings_frame:SetSize (1, 1)
-	
+
 	options.always_boxfirst = true
 	FlashTaskBar:BuildMenu(general_settings_frame, options, 15, -77, 280, false, options_text_template, options_dropdown_template, options_switch_template, true, options_slider_template, options_button_template)
-	
+
 	local y_chat_scan = -250
-	
+
 	local camping_text1 = FlashTaskBar:CreateLabel (FlashTaskBar.OptionsFrame1, L["STRING_CAMPINGSETTINGS"] .. ":", FlashTaskBar:GetTemplate ("font", "ORANGE_FONT_TEMPLATE"))
 	camping_text1:SetPoint ("topleft", main_frame, "topleft", 10, y_chat_scan)
 	local sound_button_y = y_chat_scan
 	FlashTaskBar:SetFontSize (camping_text1, 16)
 	y_chat_scan = y_chat_scan - 30
-	
+
 	--> chat scan settings
-	
+
 	--> title label
 	local blink_on_chat = FlashTaskBar:CreateLabel (FlashTaskBar.OptionsFrame1, L["STRING_CHATSCAN"] .. ":", FlashTaskBar:GetTemplate ("font", "ORANGE_FONT_TEMPLATE"))
-	blink_on_chat:SetPoint ("topleft", FlashTaskBar.OptionsFrame1, "topleft", 10, y_chat_scan)	
-	
+	blink_on_chat:SetPoint ("topleft", FlashTaskBar.OptionsFrame1, "topleft", 10, y_chat_scan)
+
 	--> enabled
 	local enable_chat_filter = function (_, _, value)
 		FlashTaskBar.db.profile.chat_scan = value
@@ -1026,13 +1031,13 @@ function FlashTaskBar.OnInit (self)
 	local chat_scan_switch, chat_scan_label = FlashTaskBar:CreateSwitch (FlashTaskBar.OptionsFrame1, enable_chat_filter, FlashTaskBar.db.profile.chat_scan, _, _, _, _, "switch_enable_chat_scan", _, _, _, _, L["STRING_CHATSCAN_ENABLED"] .. ":", FlashTaskBar:GetTemplate ("switch", "OPTIONS_CHECKBOX_TEMPLATE"), FlashTaskBar:GetTemplate ("font", "OPTIONS_FONT_TEMPLATE"))
 	chat_scan_switch:SetAsCheckBox()
 	chat_scan_switch.tooltip = L["STRING_CHATSCAN_ENABLED_DESC"]
-	chat_scan_label:SetPoint ("topleft", FlashTaskBar.OptionsFrame1, "topleft", 10, y_chat_scan-20)	
-	
+	chat_scan_label:SetPoint ("topleft", FlashTaskBar.OptionsFrame1, "topleft", 10, y_chat_scan-20)
+
 	--> key words
 	--add
 	local chat_scan_keyword, label_chat_scan_keyword = FlashTaskBar:CreateTextEntry (FlashTaskBar.OptionsFrame1, function()end, 120, 20, "entry_add_keyword", _, L["STRING_ADDKEYWORD"] .. ":", FlashTaskBar:GetTemplate ("dropdown", "OPTIONS_DROPDOWN_TEMPLATE"), FlashTaskBar:GetTemplate ("font", "OPTIONS_FONT_TEMPLATE"))
-	label_chat_scan_keyword:SetPoint ("topleft", FlashTaskBar.OptionsFrame1, "topleft", 10, y_chat_scan-40)	
-	
+	label_chat_scan_keyword:SetPoint ("topleft", FlashTaskBar.OptionsFrame1, "topleft", 10, y_chat_scan-40)
+
 	local add_key_word_func = function()
 		local keyword = chat_scan_keyword.text
 		if (keyword ~= "") then
@@ -1045,7 +1050,7 @@ function FlashTaskBar.OnInit (self)
 	end
 	local button_add_keyword = FlashTaskBar:CreateButton (FlashTaskBar.OptionsFrame1, add_key_word_func, 60, 18, L["STRING_ADD"], _, _, _, _, _, _, FlashTaskBar:GetTemplate ("dropdown", "OPTIONS_DROPDOWN_TEMPLATE"), FlashTaskBar:GetTemplate ("font", "OPTIONS_FONT_TEMPLATE"))
 	button_add_keyword:SetPoint ("left", chat_scan_keyword, "right", 2, 0)
-	
+
 	--remove
 	local dropdown_keyword_erase_fill = function()
 		local t = {}
@@ -1067,17 +1072,17 @@ function FlashTaskBar.OnInit (self)
 	local button_keyword_remove = FlashTaskBar:CreateButton (FlashTaskBar.OptionsFrame1, keyword_remove, 60, 18, L["STRING_REMOVE"], _, _, _, _, _, _, FlashTaskBar:GetTemplate ("dropdown", "OPTIONS_DROPDOWN_TEMPLATE"), FlashTaskBar:GetTemplate ("font", "OPTIONS_FONT_TEMPLATE"))
 	button_keyword_remove:SetPoint ("left", dropdown_keyword_remove, "right", 2, 0)
 	label_keyword_remove:SetPoint ("topleft", FlashTaskBar.OptionsFrame1, "topleft", 10, y_chat_scan-60)
-	
+
 	--ativar o chat scan se necess�rio
 	if (FlashTaskBar.db.profile.chat_scan or FlashTaskBar.db.profile.on_chat_player_name) then
 		FlashTaskBar:EnableChatScan()
 	end
-	
+
 	--> combat log scan settings
 	--> title label
 	local blink_on_combatlog = FlashTaskBar:CreateLabel (FlashTaskBar.OptionsFrame1, L["STRING_COMBATLOGSCAN"] .. ":", FlashTaskBar:GetTemplate ("font", "ORANGE_FONT_TEMPLATE"))
-	blink_on_combatlog:SetPoint ("topleft", FlashTaskBar.OptionsFrame1, "topleft", 10, y_chat_scan-90)		
-	
+	blink_on_combatlog:SetPoint ("topleft", FlashTaskBar.OptionsFrame1, "topleft", 10, y_chat_scan-90)
+
 	--> enabled
 	local enable_combatlog_filter = function (_, _, value)
 		FlashTaskBar.db.profile.combat_log = value
@@ -1088,15 +1093,15 @@ function FlashTaskBar.OnInit (self)
 		end
 	end
 	local combatlog_scan_switch, combatlog_scan_label = FlashTaskBar:CreateSwitch (FlashTaskBar.OptionsFrame1, enable_combatlog_filter, FlashTaskBar.db.profile.combat_log, _, _, _, _, "switch_enable_combatlog_scan", _, _, _, _, L["STRING_COMBATLOGSCAN_ENABLED"]  .. ":", FlashTaskBar:GetTemplate ("switch", "OPTIONS_CHECKBOX_TEMPLATE"), FlashTaskBar:GetTemplate ("font", "OPTIONS_FONT_TEMPLATE"))
-	combatlog_scan_switch.tooltip = L["STRING_COMBATLOGSCAN_ENABLED_DESC"] 
+	combatlog_scan_switch.tooltip = L["STRING_COMBATLOGSCAN_ENABLED_DESC"]
 	combatlog_scan_switch:SetAsCheckBox()
-	combatlog_scan_label:SetPoint ("topleft", FlashTaskBar.OptionsFrame1, "topleft", 10, y_chat_scan-110)	
-	
+	combatlog_scan_label:SetPoint ("topleft", FlashTaskBar.OptionsFrame1, "topleft", 10, y_chat_scan-110)
+
 	--> key words
 	--add
 	local combatlog_scan_keyword, label_combatlog_scan_keyword = FlashTaskBar:CreateTextEntry (FlashTaskBar.OptionsFrame1, function()end, 120, 20, "entry_add_keyword", _, L["STRING_RARENPCSCAN_NPCNAME"] .. ":", FlashTaskBar:GetTemplate ("dropdown", "OPTIONS_DROPDOWN_TEMPLATE"), FlashTaskBar:GetTemplate ("font", "OPTIONS_FONT_TEMPLATE"))
-	label_combatlog_scan_keyword:SetPoint ("topleft", FlashTaskBar.OptionsFrame1, "topleft", 10, y_chat_scan-130)	
-	
+	label_combatlog_scan_keyword:SetPoint ("topleft", FlashTaskBar.OptionsFrame1, "topleft", 10, y_chat_scan-130)
+
 	local add_key_word_func = function()
 		local keyword = combatlog_scan_keyword.text
 		if (keyword ~= "") then
@@ -1110,7 +1115,7 @@ function FlashTaskBar.OnInit (self)
 	end
 	local button_add_keyword = FlashTaskBar:CreateButton (FlashTaskBar.OptionsFrame1, add_key_word_func, 60, 18, L["STRING_ADD"], _, _, _, _, _, _, FlashTaskBar:GetTemplate ("dropdown", "OPTIONS_DROPDOWN_TEMPLATE"), FlashTaskBar:GetTemplate ("font", "OPTIONS_FONT_TEMPLATE"))
 	button_add_keyword:SetPoint ("left", combatlog_scan_keyword, "right", 2, 0)
-	
+
 	--remove
 	local dropdown_keyword_erase_fill = function()
 		local t = {}
@@ -1133,7 +1138,7 @@ function FlashTaskBar.OnInit (self)
 	local button_keyword_remove = FlashTaskBar:CreateButton (FlashTaskBar.OptionsFrame1, keyword_remove, 60, 18, L["STRING_REMOVE"], _, _, _, _, _, _, FlashTaskBar:GetTemplate ("dropdown", "OPTIONS_DROPDOWN_TEMPLATE"), FlashTaskBar:GetTemplate ("font", "OPTIONS_FONT_TEMPLATE"))
 	button_keyword_remove:SetPoint ("left", dropdown_keyword_remove, "right", 2, 0)
 	label_keyword_remove:SetPoint ("topleft", FlashTaskBar.OptionsFrame1, "topleft", 10, y_chat_scan-150)
-	
+
 	if (FlashTaskBar.db.profile.combat_log) then
 		FlashTaskBar:EnableCombatLogScan()
 	end
@@ -1141,8 +1146,8 @@ function FlashTaskBar.OnInit (self)
 	--> rare mob scan settings
 	--> title label
 	local blink_on_raremob = FlashTaskBar:CreateLabel (FlashTaskBar.OptionsFrame1, L["STRING_RARENPCSCAN"] .. ":", FlashTaskBar:GetTemplate ("font", "ORANGE_FONT_TEMPLATE"))
-	blink_on_raremob:SetPoint ("topleft", FlashTaskBar.OptionsFrame1, "topleft", 10, y_chat_scan-180)		
-	
+	blink_on_raremob:SetPoint ("topleft", FlashTaskBar.OptionsFrame1, "topleft", 10, y_chat_scan-180)
+
 	--> enabled
 	local enable_raremob_filter = function (_, _, value)
 		FlashTaskBar.db.profile.rare_scan = value
@@ -1155,21 +1160,21 @@ function FlashTaskBar.OnInit (self)
 	local raremob_scan_switch, raremob_scan_label = FlashTaskBar:CreateSwitch (FlashTaskBar.OptionsFrame1, enable_raremob_filter, FlashTaskBar.db.profile.rare_scan, _, _, _, _, "switch_enable_raremob_scan", _, _, _, _, L["STRING_RARENPCSCAN_ENABLED"] .. ":", FlashTaskBar:GetTemplate ("switch", "OPTIONS_CHECKBOX_TEMPLATE"), FlashTaskBar:GetTemplate ("font", "OPTIONS_FONT_TEMPLATE"))
 	raremob_scan_switch:SetAsCheckBox()
 	raremob_scan_switch.tooltip = L["STRING_RARENPCSCAN_DESC"]
-	raremob_scan_label:SetPoint ("topleft", FlashTaskBar.OptionsFrame1, "topleft", 10, y_chat_scan-200)	
-	
+	raremob_scan_label:SetPoint ("topleft", FlashTaskBar.OptionsFrame1, "topleft", 10, y_chat_scan-200)
+
 	--> all rares
 	local enable_raremob_all_filter = function (_, _, value)
 		FlashTaskBar.db.profile.any_rare = value
 	end
 	local raremob_all_scan_switch, raremob_all_scan_label = FlashTaskBar:CreateSwitch (FlashTaskBar.OptionsFrame1, enable_raremob_all_filter, FlashTaskBar.db.profile.any_rare, _, _, _, _, "switch_enable_raremob_all_scan", _, _, _, _, L["STRING_RARENPCSCAN_ANYNPC"] .. ":", FlashTaskBar:GetTemplate ("switch", "OPTIONS_CHECKBOX_TEMPLATE"), FlashTaskBar:GetTemplate ("font", "OPTIONS_FONT_TEMPLATE"))
 	raremob_all_scan_switch:SetAsCheckBox()
-	raremob_all_scan_label:SetPoint ("topleft", FlashTaskBar.OptionsFrame1, "topleft", 10, y_chat_scan-220)	
-	
+	raremob_all_scan_label:SetPoint ("topleft", FlashTaskBar.OptionsFrame1, "topleft", 10, y_chat_scan-220)
+
 	--> key words
 	--add
 	local raremob_scan_keyword, label_raremob_scan_keyword = FlashTaskBar:CreateTextEntry (FlashTaskBar.OptionsFrame1, function()end, 120, 20, "raremob_add_keyword", _, L["STRING_RARENPCSCAN_NPCNAME"] .. ":", FlashTaskBar:GetTemplate ("dropdown", "OPTIONS_DROPDOWN_TEMPLATE"), FlashTaskBar:GetTemplate ("font", "OPTIONS_FONT_TEMPLATE"))
-	label_raremob_scan_keyword:SetPoint ("topleft", FlashTaskBar.OptionsFrame1, "topleft", 10, y_chat_scan-240)	
-	
+	label_raremob_scan_keyword:SetPoint ("topleft", FlashTaskBar.OptionsFrame1, "topleft", 10, y_chat_scan-240)
+
 	local add_key_word_func = function()
 		local keyword = raremob_scan_keyword.text
 		if (keyword ~= "") then
@@ -1182,7 +1187,7 @@ function FlashTaskBar.OnInit (self)
 	end
 	local button_add_keyword = FlashTaskBar:CreateButton (FlashTaskBar.OptionsFrame1, add_key_word_func, 60, 18, L["STRING_ADD"], _, _, _, _, _, _, FlashTaskBar:GetTemplate ("dropdown", "OPTIONS_DROPDOWN_TEMPLATE"), FlashTaskBar:GetTemplate ("font", "OPTIONS_FONT_TEMPLATE"))
 	button_add_keyword:SetPoint ("left", raremob_scan_keyword, "right", 2, 0)
-	
+
 	--remove
 	local dropdown_keyword_erase_fill = function()
 		local t = {}
@@ -1204,42 +1209,42 @@ function FlashTaskBar.OnInit (self)
 	local button_keyword_remove = FlashTaskBar:CreateButton (FlashTaskBar.OptionsFrame1, keyword_remove, 60, 20, L["STRING_REMOVE"], _, _, _, _, _, _, FlashTaskBar:GetTemplate ("dropdown", "OPTIONS_DROPDOWN_TEMPLATE"), FlashTaskBar:GetTemplate ("font", "OPTIONS_FONT_TEMPLATE"))
 	button_keyword_remove:SetPoint ("left", dropdown_keyword_remove, "right", 2, 0)
 	label_keyword_remove:SetPoint ("topleft", FlashTaskBar.OptionsFrame1, "topleft", 10, y_chat_scan-260)
-	
+
 	if (FlashTaskBar.db.profile.rare_scan) then
 		FlashTaskBar:EnableRareMobScan()
 	end
-	
+
 	--> sound options
 	local sound_x = 380
 	local sound_text1 = FlashTaskBar:CreateLabel (FlashTaskBar.OptionsFrame1, L["STRING_SOUNDSETTINGS"] .. ":", FlashTaskBar:GetTemplate ("font", "ORANGE_FONT_TEMPLATE"))
 	sound_text1:SetPoint ("topleft", main_frame, "topleft", sound_x, sound_button_y)
 	FlashTaskBar:SetFontSize (sound_text1, 16)
-	
+
 	local open_sound_panel = function()
 		if (_G.FlashTaskbarSoundSettings) then
 			_G.FlashTaskbarSoundSettings:Show()
 			return
 		end
-		
+
 		local f = DF:Create1PxPanel (FlashTaskBar.OptionsFrame1, 450, 300, "", "FlashTaskbarSoundSettings", nil, nil, nil)
 		f:SetPoint ("center", FlashTaskBar.OptionsFrame1, "center")
 		f:SetSize (FlashTaskBar.OptionsFrame1:GetSize())
 		f:SetFrameLevel (FlashTaskBar.OptionsFrame1:GetFrameLevel()+5)
 		f:SetLocked (true)
-		
+
 		f:SetBackdrop ({bgFile = [[Interface\DialogFrame\UI-DialogBox-Background-Dark]], tile = true, tileSize = 64})
 		f:SetBackdropColor (0, 0, 0, 1)
-		
+
 		local close_sound_settings = FlashTaskBar:CreateButton (f, function() f:Hide() end, 160, 20, L["STRING_CLOSESOUNDPANEL"], _, _, _, _, _, _, FlashTaskBar:GetTemplate ("dropdown", "OPTIONS_DROPDOWN_TEMPLATE"), FlashTaskBar:GetTemplate ("font", "OPTIONS_FONT_TEMPLATE"))
 		close_sound_settings:SetPoint ("topleft", f, "topleft", 10, -520)
 		close_sound_settings:SetIcon ([[Interface\Scenarios\ScenarioIcon-Check]], 16, 16, "overlay", {0, 1, 0, 1}, nil, 6, nil, 1)
-		
+
 		local sound_title = FlashTaskBar:CreateLabel (f, L["STRING_SOUNDSETTINGS"] .. ":", FlashTaskBar:GetTemplate ("font", "ORANGE_FONT_TEMPLATE"))
 		sound_title:SetPoint ("topleft", f, "topleft", 10, -50)
 		FlashTaskBar:SetFontSize (sound_title, 16)
 		local sound_title_desc = FlashTaskBar:CreateLabel (f, L["STRING_SOUNDSETTINGS_DESC"] .. ":", FlashTaskBar:GetTemplate ("font", "ORANGE_FONT_TEMPLATE"))
 		sound_title_desc:SetPoint ("topleft", f, "topleft", 10, -70)
-		
+
 		local localize_key = {
 			readycheck = "READYCHECK",
 			arena_queue = "PVPQUEUES",
@@ -1264,7 +1269,7 @@ function FlashTaskBar.OnInit (self)
 			on_chat_player_name = "PLAYERNAME",
 			player_died = "ONPLAYERDEATH",
 		}
-		
+
 		--the game cannot play sounds when logging off
 		local settings = {
 			"rare_scan",
@@ -1289,11 +1294,11 @@ function FlashTaskBar.OnInit (self)
 			"battleground_end",
 			"player_died"
 		}
-		
+
 		local sound_options = {}
 		local y = -95
 		local x = 10
-		
+
 		local checkbox_ontoggle = function (self, _, value)
 			self.MyConfigTable.enabled = not self.MyConfigTable.enabled
 		end
@@ -1306,19 +1311,19 @@ function FlashTaskBar.OnInit (self)
 			if (not SoundTable) then
 				SoundTable = {}
 				local SharedMedia = LibStub:GetLibrary("LibSharedMedia-3.0")
-				for name, _ in pairs (SharedMedia:HashTable ("sound")) do 
+				for name, _ in pairs (SharedMedia:HashTable ("sound")) do
 					tinsert (SoundTable, {value = name, label = name, onclick = sound_dropdown_selected})
 				end
 			end
-			return SoundTable 
+			return SoundTable
 		end
-		
+
 		local switch_name = 999
 		for index, config_key in  ipairs (settings) do
 			local name_locale = L["STRING_" .. localize_key [config_key]] .. ":"
 			local desc_locale = L["STRING_" .. localize_key [config_key] .. "_DESC"]
 			local config_table = FlashTaskBar.db.profile.sound_enabled [config_key]
-			
+
 			local label = FlashTaskBar:CreateLabel (f, name_locale, FlashTaskBar:GetTemplate ("font", "ORANGE_FONT_TEMPLATE"))
 			label.color = "yellow"
 			label:SetPoint (x, y)
@@ -1328,16 +1333,16 @@ function FlashTaskBar.OnInit (self)
 			checkbox.tooltip = desc_locale
 			checkbox.MyConfigTable = config_table
 			checkbox:SetPoint (x + 120, y)
-			
+
 			local dropdown = FlashTaskBar:CreateDropDown (f, sound_dropdown_fill, config_table.sound, 160, 20, _, _, FlashTaskBar:GetTemplate ("dropdown", "OPTIONS_DROPDOWN_TEMPLATE"))
 			dropdown.MyConfigTable = config_table
 			dropdown:SetPoint (x + 180, y)
-		
+
 			y = y - 20
-			
+
 			switch_name = switch_name + 1
 		end
-		
+
 		FlashTaskBar.NoBGSound = FlashTaskBar:CreateLabel (f, L["STRING_BACKGROUND_SOUND"], FlashTaskBar:GetTemplate ("font", "ORANGE_FONT_TEMPLATE"))
 		FlashTaskBar.NoBGSound.color = "red"
 		FlashTaskBar.NoBGSound.fontsize = 12
@@ -1353,7 +1358,7 @@ function FlashTaskBar.OnInit (self)
 			end
 		end)
 	end
-	
+
 	local open_sound_settings = FlashTaskBar:CreateButton (FlashTaskBar.OptionsFrame1, open_sound_panel, 160, 18, L["STRING_OPENSOUNDPANEL"], _, _, _, _, _, _, FlashTaskBar:GetTemplate ("dropdown", "OPTIONS_DROPDOWN_TEMPLATE"), FlashTaskBar:GetTemplate ("font", "OPTIONS_FONT_TEMPLATE"))
 	open_sound_settings:SetPoint ("topleft", main_frame, "topleft", sound_x-1, sound_button_y-30)
 	open_sound_settings:SetIcon ([[Interface\Buttons\UI-GuildButton-MOTD-Up]], 16, 15, "overlay", {1, 0, 0, 1}, nil, 6, nil, 1)
