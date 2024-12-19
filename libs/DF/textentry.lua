@@ -1,4 +1,17 @@
 
+--[=[
+	When enter is pressed a callback function is called in this format:
+
+	local onEnterPressed = function(parameter1, parameter2, text, self, byScript)
+		--parameter1 and parameter2 are set with self:SetParameters(param1, param2)
+		--they act like fixed parameters for the callback
+		--use they to use a single function for multiple text entries
+	end
+	
+textentry.MyObject.func(textentry.MyObject.param1, textentry.MyObject.param2, text, textentry, byScript or textentry)
+
+--]=]
+
 local detailsFramework = _G["DetailsFramework"]
 if (not detailsFramework or not DetailsFrameworkCanLoad) then
 	return
@@ -224,6 +237,16 @@ detailsFramework.TextEntryCounter = detailsFramework.TextEntryCounter or 1
 		self.next = nextbox
 	end
 
+	function TextEntryMetaFunctions:SetParameters(param1, param2)
+		if (param1 ~= nil) then
+			self.param1 = param1
+		end
+
+		if (param2 ~= nil) then
+			self.param2 = param2
+		end
+	end
+
 	--blink
 	function TextEntryMetaFunctions:Blink()
 		self.label:SetTextColor(1, .2, .2, 1)
@@ -287,7 +310,12 @@ detailsFramework.TextEntryCounter = detailsFramework.TextEntryCounter or 1
 
 		if (textentry:IsEnabled()) then
 			textentry.current_bordercolor = textentry.current_bordercolor or {textentry:GetBackdropBorderColor()}
-			textentry:SetBackdropBorderColor(1, 1, 1, 1)
+			local onEnterBorderColor = object.onenter_backdrop_border_color
+			if (onEnterBorderColor) then
+				textentry:SetBackdropBorderColor(detailsFramework:ParseColors(onEnterBorderColor))
+			else
+				textentry:SetBackdropBorderColor(1, 1, 1, 0.6)
+			end
 		end
 	end
 
@@ -512,6 +540,12 @@ detailsFramework.TextEntryCounter = detailsFramework.TextEntryCounter or 1
 ------------------------------------------------------------------------------------------------------------
 
 function TextEntryMetaFunctions:SetTemplate(template)
+	template = detailsFramework:ParseTemplate(self.type, template) --"textentry"
+
+	if (template.multiline) then
+		self.editbox:SetMultiLine(true)
+	end
+
 	if (template.width) then
 		self.editbox:SetWidth(template.width)
 	end
@@ -522,11 +556,13 @@ function TextEntryMetaFunctions:SetTemplate(template)
 	if (template.backdrop) then
 		self.editbox:SetBackdrop(template.backdrop)
 	end
+
 	if (template.backdropcolor) then
 		local r, g, b, a = detailsFramework:ParseColors(template.backdropcolor)
 		self.editbox:SetBackdropColor(r, g, b, a)
 		self.onleave_backdrop = {r, g, b, a}
 	end
+
 	if (template.backdropbordercolor) then
 		local r, g, b, a = detailsFramework:ParseColors(template.backdropbordercolor)
 		self.editbox:SetBackdropBorderColor(r, g, b, a)
@@ -536,7 +572,39 @@ function TextEntryMetaFunctions:SetTemplate(template)
 		self.editbox.current_bordercolor[4] = a
 		self.onleave_backdrop_border_color = {r, g, b, a}
 	end
+
+	if (template.onentercolor) then
+		local r, g, b, a = detailsFramework:ParseColors(template.onentercolor)
+		self.onenter_backdrop = {r, g, b, a}
+		self:HookScript("OnEnter", detailsFramework.TemplateOnEnter)
+		self.__has_onentercolor_script = true
+	end
+
+	if (template.onleavecolor) then
+		local r, g, b, a = detailsFramework:ParseColors(template.onleavecolor)
+		self.onleave_backdrop = {r, g, b, a}
+		self:HookScript("OnLeave", detailsFramework.TemplateOnLeave)
+		self.__has_onleavecolor_script = true
+	end
+
+	if (template.onenterbordercolor) then
+		local r, g, b, a = detailsFramework:ParseColors(template.onenterbordercolor)
+		self.onenter_backdrop_border_color = {r, g, b, a}
+		if (not self.__has_onentercolor_script) then
+			self:HookScript("OnEnter", detailsFramework.TemplateOnEnter)
+		end
+	end
+
+	if (template.onleavebordercolor) then
+		local r, g, b, a = detailsFramework:ParseColors(template.onleavebordercolor)
+		self.onleave_backdrop_border_color = {r, g, b, a}
+		if (not self.__has_onleavecolor_script) then
+			self:HookScript("OnLeave", detailsFramework.TemplateOnLeave)
+		end
+	end
 end
+
+--TextEntryMetaFunctions.SetTemplate = DetailsFramework.SetTemplate
 
 ------------------------------------------------------------------------------------------------------------
 --object constructor
@@ -552,17 +620,21 @@ end
 ---@field multiline any
 ---@field align any
 ---@field fontsize any
+---@field param1 any
+---@field param2 any
 ---@field ShouldOptimizeAutoComplete boolean?
----@field SetTemplate fun(self:df_textentry, template:table)
+---@field AutoComplete_StopOnEnterPress boolean?
+---@field SetTemplate fun(self:df_textentry, template:table|string)
 ---@field Disable fun(self:df_textentry)
 ---@field Enable fun(self:df_textentry)
 ---@field SetCommitFunction fun(self:df_textentry, func:function)
+---@field SetParameters fun(self:df_textentry, param1:any, param2:any)
 ---@field SetNext fun(self:df_textentry, next:df_textentry)
 ---@field SetLabelText fun(self:df_textentry, text:string)
 ---@field SelectAll fun(self:df_textentry)
 ---@field SetAutoSelectTextOnFocus fun(self:df_textentry, value:boolean)
 ---@field Blink fun(self:df_textentry)
----@field SetText fun(self:df_textentry, text:string)
+---@field SetText fun(self:df_textentry, text:string|number)
 ---@field GetText fun(self:df_textentry)
 ---@field SetEnterFunction fun(self:df_textentry, func:function, param1:any, param2:any)
 ---@field SetHook fun(self:df_textentry, hookName:string, func:function)
@@ -878,6 +950,9 @@ local AutoComplete_OnEnterPressed = function(editboxWidget)
 	end
 	capsule.lastword = ""
 
+	if (capsule.AutoComplete_StopOnEnterPress) then
+		editboxWidget:ClearFocus()
+	end
 end
 
 local AutoComplete_OnEditFocusGained = function(editboxWidget)

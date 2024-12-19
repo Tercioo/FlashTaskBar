@@ -63,7 +63,7 @@ detailsFramework.TooltipHandlerMixin = {
 		if (tooltipText and tooltipText ~= "") then
 			GameCooltip:Preset(2)
 			GameCooltip:AddLine(tooltipText)
-			GameCooltip:ShowRoundedCorner()
+			--GameCooltip:ShowRoundedCorner() --disabled rounded corners by default
 			GameCooltip:ShowCooltip(getFrame(self), "tooltip")
 		end
 	end,
@@ -188,6 +188,12 @@ local doublePoint = {
 	["left-right"] = true,
 }
 
+---@alias anchor_name "lefts" | "rights" | "tops" | "bottoms" | "left-left" | "right-right" | "top-top" | "bottom-bottom" | "bottom-top" | "top-bottom" | "right-left" | "left-right" | "topleft" | "topright" | "bottomleft" | "bottomright" | "left" | "right" | "top" | "bottom" | "center"
+
+---@class df_setpoint : table
+---@field SetPoint fun(self: table, anchorName1: anchor_name, anchorObject: table?, anchorName2: string?, xOffset: number?, yOffset: number?)
+---@field SetPoints fun(self: table, anchorName1: anchor_name, anchorObject: table?, anchorName2: string?, xOffset: number?, yOffset: number?)
+
 detailsFramework.SetPointMixin = {
 	SetPoint = function(object, anchorName1, anchorObject, anchorName2, xOffset, yOffset)
 		if (doublePoint[anchorName1]) then
@@ -267,6 +273,8 @@ detailsFramework.SetPointMixin = {
 		end
 	end,
 }
+
+detailsFramework.SetPointMixin.SetPoints = detailsFramework.SetPointMixin.SetPoint
 
 ---mixin for options
 ---@class df_optionsmixin
@@ -474,7 +482,7 @@ detailsFramework.SortFunctions = {
 ---@field GetDataMinMaxValueFromSubTable fun(self: df_data, key: string) : number, number when data uses sub tables, get the min max values from a specific index or key, if the value stored is number, return the min and max values
 ---@field SetData fun(self: df_data, data: table, anyValue: any)
 ---@field SetDataRaw fun(self: df_data, data: table) set the data without triggering callback
----@field GetDataNextValue fun(self: df_data) : any
+---@field GetDataNextValue fun(self: df_data) : any, number get the next value from the data table, return the value and the index
 ---@field ResetDataIndex fun(self: df_data)
 
 ---mixin to use with DetailsFramework:Mixin(table, detailsFramework.DataMixin)
@@ -543,11 +551,12 @@ detailsFramework.DataMixin = {
 	---get the next value from the data table
 	---@param self table
 	---@return any
+	---@return number
 	GetDataNextValue = function(self)
 		local currentValue = self._dataInfo.dataCurrentIndex
 		local value = self:GetData()[currentValue]
 		self._dataInfo.dataCurrentIndex = self._dataInfo.dataCurrentIndex + 1
-		return value
+		return value, currentValue
 	end,
 
 	---reset the data index, making GetDataNextValue() return the first value again

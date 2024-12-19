@@ -31,7 +31,8 @@ detailsFramework.Schedules.AfterCombatSchedules = {
 ---@field CancelAllAfterCombat fun()
 ---@field IsAfterCombatScheduled fun(id: any): boolean
 ---@field LazyExecute fun(callback: function, payload: table?, maxIterations: number?, onEndCallback: function?): table
----@field AfterById fun(time: number, callback: function, id: any, ...: any): timer
+---@field AfterById fun(time: number, callback: function, id: any, ...: any): timer cancel the existing timer with same id and start it again
+---@field AfterByIdNoCancel fun(time: number, callback: function, id: any, ...: any): timer block all sub sequent calls with the same id until the timer is finished
 
 ---@class df_looper : table
 ---@field payload table
@@ -220,10 +221,12 @@ end
 ---execute each frame a small portion of a big task
 ---the callback function receives a payload, the current iteration index and the max iterations
 ---if the callback function return true, the task is finished
+---callback function signature: fun(payload: table, iterationCount:number, maxIterations:number):boolean return true if the task is finished
+---payload table is the same table passed as argument to LazyExecute()
 ---@param callback function
 ---@param payload table?
 ---@param maxIterations number?
----@param onEndCallback function?
+---@param onEndCallback function? execute when the task is finished or when maxIterations is reached
 function detailsFramework.Schedules.LazyExecute(callback, payload, maxIterations, onEndCallback)
     assert(type(callback) == "function", "DetailsFramework.Schedules.LazyExecute() param #1 'callback' must be a function.")
     maxIterations = maxIterations or 100000
@@ -235,12 +238,16 @@ function detailsFramework.Schedules.LazyExecute(callback, payload, maxIterations
         if (not bIsFinished) then
             iterationIndex = iterationIndex + 1
             if (iterationIndex > maxIterations) then
-                detailsFramework:QuickDispatch(onEndCallback, payload)
+                if (onEndCallback) then
+                    detailsFramework:QuickDispatch(onEndCallback, payload)
+                end
                 return
             end
             C_Timer.After(0, function() wrapFunc() end)
         else
-            detailsFramework:QuickDispatch(onEndCallback, payload)
+            if (onEndCallback) then
+                detailsFramework:QuickDispatch(onEndCallback, payload)
+            end
             return
         end
     end
