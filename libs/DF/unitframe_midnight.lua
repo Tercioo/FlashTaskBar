@@ -5,7 +5,7 @@ if (not detailsFramework or not DetailsFrameworkCanLoad) then
 	return
 end
 
-if detailsFramework.IsMidnightWow() then return end
+if not detailsFramework.IsMidnightWow() then return end
 
 local _
 --lua locals
@@ -26,6 +26,8 @@ end
 
 local UnitHealth = UnitHealth
 local UnitHealthMax = UnitHealthMax
+local UnitHealthMissing = UnitHealthMissing
+local UnitHealthPercent = UnitHealthPercent
 local UnitGetIncomingHeals = UnitGetIncomingHeals
 local UnitGetTotalHealAbsorbs = UnitGetTotalHealAbsorbs
 local UnitGetTotalAbsorbs = UnitGetTotalAbsorbs
@@ -186,8 +188,10 @@ local cleanfunction = function() end
 
 			--register events
 			if (unit) then
-				self.currentHealth = UnitHealth(unit) or 0
-				self.currentHealthMax = UnitHealthMax(unit) or 0
+				self.currentHealth = UnitHealth(unit)
+				self.currentHealthMax = UnitHealthMax(unit)
+				self.currentHealthMissing = UnitHealthMissing(unit, true)
+				self.currentHealthPercent = UnitHealthPercent(unit, true, true)
 
 				for _, eventTable in ipairs(self.HealthBarEvents) do
 					local event = eventTable[1]
@@ -286,8 +290,10 @@ local cleanfunction = function() end
 	--when the unit max health is changed
 	healthBarMetaFunctions.UpdateMaxHealth = function(self)
 		local maxHealth = UnitHealthMax(self.displayedUnit)
-		self:SetMinMaxValues(0, maxHealth)
+		self:SetMinMaxValues(0, maxHealth, Enum.StatusBarInterpolation.ExponentialEaseOut)
 		self.currentHealthMax = maxHealth
+		self.currentHealthMissing = UnitHealthMissing(self.displayedUnit, true)
+		self.currentHealthPercent = UnitHealthPercent(self.displayedUnit, true, true)
 
 		if (self.OnHealthMaxChange) then --direct call
 			self.OnHealthMaxChange(self, self.displayedUnit)
@@ -305,7 +311,9 @@ local cleanfunction = function() end
 		self.oldHealth = self.currentHealth
 		local health = UnitHealth(self.displayedUnit)
 		self.currentHealth = health
-		PixelUtil.SetStatusBarValue(self, health)
+		self.currentHealthMissing = UnitHealthMissing(self.displayedUnit, true)
+		self.currentHealthPercent = UnitHealthPercent(self.displayedUnit, true, true)
+		self:SetValue(health, Enum.StatusBarInterpolation.ExponentialEaseOut)
 
 		if (self.OnHealthChange) then --direct call
 			self.OnHealthChange(self, self.displayedUnit)
@@ -316,6 +324,10 @@ local cleanfunction = function() end
 
 	--health and absorbs prediction
 	healthBarMetaFunctions.UpdateHealPrediction = function(self)
+		-- arithmetics not allowed, we will see...
+		if true then return end --MIDNIGHT!!
+		
+		
 		local currentHealth = self.currentHealth
 		local currentHealthMax = self.currentHealthMax
 
@@ -330,9 +342,9 @@ local cleanfunction = function() end
 
 		if (self.Settings.ShowHealingPrediction) then
 			--incoming heal on the unit from all sources
-			local unitHealIncoming = UnitGetIncomingHeals and self.displayedUnit and UnitGetIncomingHeals(self.displayedUnit) or 0
+			local unitHealIncoming = UnitGetIncomingHeals and self.displayedUnit and UnitGetIncomingHeals(self.displayedUnit)
 			--heal absorbs
-			local unitHealAbsorb = UnitGetTotalHealAbsorbs and self.displayedUnit and UnitGetTotalHealAbsorbs(self.displayedUnit) or 0
+			local unitHealAbsorb = UnitGetTotalHealAbsorbs and self.displayedUnit and UnitGetTotalHealAbsorbs(self.displayedUnit)
 
 			if (unitHealIncoming > 0) then
 				--calculate what is the percent of health incoming based on the max health the player has
@@ -358,7 +370,7 @@ local cleanfunction = function() end
 
 		if (self.Settings.ShowShields and UnitGetTotalAbsorbs) then
 			--damage absorbs
-			local unitDamageAbsorb = self.displayedUnit and UnitGetTotalAbsorbs (self.displayedUnit) or 0
+			local unitDamageAbsorb = self.displayedUnit and UnitGetTotalAbsorbs (self.displayedUnit)
 
 			if (unitDamageAbsorb > 0) then
 				local damageAbsorbPercent = unitDamageAbsorb / currentHealthMax
@@ -371,7 +383,7 @@ local cleanfunction = function() end
 
 				--if the absorb percent pass 100%, show the glow
 				if ((healthPercent + damageAbsorbPercent) > 1) then
-					self.nextShieldHook = self.nextShieldHook or 0
+					self.nextShieldHook = self.nextShieldHook
 
 					if (GetTime() >= self.nextShieldHook) then
 						self:RunHooksForWidget("OnAbsorbOverflow", self, self.displayedUnit, healthPercent + damageAbsorbPercent - 1)
@@ -663,19 +675,23 @@ detailsFramework.PowerFrameFunctions = {
 	--power update
 	UpdateMaxPower = function(self)
 		self.currentPowerMax = UnitPowerMax(self.displayedUnit, self.powerType)
+		self.currentPowerMissing = UnitPowerMissing(self.displayedUnit, self.powerType)
+		self.currentPowerPercent = UnitPowerPercent(self.displayedUnit, self.powerType, false, true)
 		self:SetMinMaxValues(self.minPower, self.currentPowerMax)
 
-		if (self.currentPowerMax == 0 and self.Settings.HideIfNoPower) then
+		if (not issecretvalue(self.currentPowerMax) and self.currentPowerMax == 0 and self.Settings.HideIfNoPower) then
 			self:Hide()
 		end
 	end,
 
 	UpdatePower = function(self)
 		self.currentPower = UnitPower(self.displayedUnit, self.powerType)
-		PixelUtil.SetStatusBarValue(self, self.currentPower)
+		self.currentPowerMissing = UnitPowerMissing(self.displayedUnit, self.powerType)
+		self.currentPowerPercent = UnitPowerPercent(self.displayedUnit, self.powerType, false, true)
+		self:SetValue(self.currentPower)
 
 		if (self.Settings.ShowPercentText) then
-			self.percentText:SetText(floor(self.currentPower / self.currentPowerMax * 100) .. "%")
+			self.percentText:SetText(format("%.3g%%", self.currentPowerPercent))
 		end
 	end,
 
@@ -1053,7 +1069,7 @@ detailsFramework.CastFrameFunctions = {
 		end
 
 		if (not self.Settings.ShowTradeSkills) then
-			if (isTradeSkill) then
+			if (not issecretvalue(isTradeSkill) and isTradeSkill) then
 				return false
 			end
 		end
@@ -1079,14 +1095,16 @@ detailsFramework.CastFrameFunctions = {
 	CheckCastIsDone = function(self, event, isFinished)
 		--check max value
 		if (not isFinished and not self.finished) then
-			if (self.casting) then
-				if (self.value >= self.maxValue) then
-					isFinished = true
-				end
+			if not issecretvalue(self.value) and not issecretvalue(self.maxValue) then
+				if (self.casting) then
+					if (self.value >= self.maxValue) then
+						isFinished = true
+					end
 
-			elseif (self.channeling) then
-				if (self.value > self.maxValue or self.value <= 0) then
-					isFinished = true
+				elseif (self.channeling) then
+					if (self.value > self.maxValue or self.value <= 0) then
+						isFinished = true
+					end
 				end
 			end
 
@@ -1241,7 +1259,7 @@ detailsFramework.CastFrameFunctions = {
 					--[[if not self.spellStartTime then
 						self:UpdateCastingInfo(self.unit)
 					end]]--
-					self.value = GetTime() - self.spellStartTime
+					self.value = GetTimePreciseSec() * 1000 --GetTime() - self.spellStartTime
 				end
 
 				self:RunHooksForWidget("OnShow", self, self.unit)
@@ -1252,7 +1270,8 @@ detailsFramework.CastFrameFunctions = {
 					--[[if not self.spellEndTime then
 						self:UpdateChannelInfo(self.unit)
 					end]]--
-					self.value = self.empowered and (GetTime() - self.spellStartTime) or (self.spellEndTime - GetTime())
+					--self.value = self.empowered and (GetTime() - self.spellStartTime) or (self.spellEndTime - GetTime())
+					 self.value = GetTimePreciseSec() * 1000
 				end
 
 				self:RunHooksForWidget("OnShow", self, self.unit)
@@ -1283,6 +1302,11 @@ detailsFramework.CastFrameFunctions = {
 	end,
 
 	OnTick_LazyTick = function(self)
+		if true then
+			self.percentText:SetText("")
+			return self.Settings.CanLazyTick
+		end
+		
 		--run the lazy tick if allowed
 		if (self.Settings.CanLazyTick) then
 			--update the cast time
@@ -1310,39 +1334,47 @@ detailsFramework.CastFrameFunctions = {
 
 	--tick function for regular casts
 	OnTick_Casting = function(self, deltaTime)
-		self.value = self.value + deltaTime
-
+		self.value = GetTimePreciseSec() * 1000
+		self:SetValue(self.value)
+		
 		if (self:CheckCastIsDone()) then
 			return
 		else
 			self:SetValue(self.value)
 		end
+		
+--[[
+		self.value = self.value + deltaTime
 
 		--update spark position
 		local sparkPosition = self.value / self.maxValue * self:GetWidth()
 		self.Spark:SetPoint("center", self, "left", sparkPosition + self.Settings.SparkOffset, 0)
 
-
+]]--
 		--in order to allow the lazy tick run, it must return true, it tell that the cast didn't finished
 		return true
 	end,
 
 	--tick function for channeling casts
 	OnTick_Channeling = function(self, deltaTime)
-		self.value = self.empowered and self.value + deltaTime or self.value - deltaTime
-
+		self.value = GetTimePreciseSec() * 1000
+		self:SetValue(self.value)
+		
 		if (self:CheckCastIsDone()) then
 			return
 		else
 			self:SetValue(self.value)
 		end
+		
+--[[
+		self.value = self.empowered and self.value + deltaTime or self.value - deltaTime
 
 		--update spark position
 		local sparkPosition = self.value / self.maxValue * self:GetWidth()
 		self.Spark:SetPoint("center", self, "left", sparkPosition + self.Settings.SparkOffset, 0)
 
 		self:CreateOrUpdateEmpoweredPips()
-
+]]--
 		return true
 	end,
 
@@ -1443,6 +1475,18 @@ detailsFramework.CastFrameFunctions = {
 	end,
 
 	PLAYER_ENTERING_WORLD = function(self, unit, arg1)
+		--midnight
+		if true then
+			self.casting = nil
+			self.channeling = nil
+			self.failed = nil
+			self.finished = nil
+			self.interrupted = nil
+			self.Spark:Hide()
+			self:Hide()
+			return
+		end
+		
 		local isChannel = CastInfo.UnitChannelInfo(unit)
 		local isRegularCast = CastInfo.UnitCastingInfo(unit)
 
@@ -1470,9 +1514,10 @@ detailsFramework.CastFrameFunctions = {
 	UpdateCastingInfo = function(self, unit, ...)
 		local unitID, castID, spellID = ...
 		local name, text, texture, startTime, endTime, isTradeSkill, uciCastID, notInterruptible, uciSpellID = CastInfo.UnitCastingInfo(unit)
-		spellID = uciSpellID or spellID
-		castID = uciCastID or castID
+		spellID = uciSpellID --or spellID
+		castID = uciCastID --or castID
 		
+--[[
 		if spellID and (not name or not texture or not text) then
 			local siName, _, siIcon, siCastTime = GetSpellInfo(spellID)
 			texture = texture or siIcon
@@ -1483,11 +1528,13 @@ detailsFramework.CastFrameFunctions = {
 				endTime = startTime + siCastTime
 			end
 		end
+		
 
 		--is valid?
 		if (not self:IsValid(unit, name, isTradeSkill, true)) then
 			return
 		end
+		
 
 		--empowered? no!
 			self.holdAtMaxTime = nil
@@ -1496,31 +1543,34 @@ detailsFramework.CastFrameFunctions = {
 			self.numStages = nil
 			self.empStages = nil
 			self:CreateOrUpdateEmpoweredPips()
-
+]]--
 		--setup cast
 			self.casting = true
 			self.channeling = nil
 			self.interrupted = nil
 			self.failed = nil
 			self.finished = nil
-			self.canInterrupt = not notInterruptible
+			self.canInterrupt = true --not notInterruptible
+			self.notInterruptible = notInterruptible
 			self.spellID = spellID
 			self.castID = castID
 			self.spellName = name
 			self.spellTexture = texture
-			self.spellStartTime = startTime / 1000
-			self.spellEndTime = endTime / 1000
-			self.value = GetTime() - self.spellStartTime
-			self.maxValue = self.spellEndTime - self.spellStartTime
+			self.spellStartTime = startTime --startTime / 1000
+			self.spellEndTime = endTime --endTime / 1000
+			self.value = GetTimePreciseSec() * 1000 --GetTime() - self.spellStartTime
+			self.minValue = startTime
+			self.maxValue = endTime --self.spellEndTime - self.spellStartTime
 
-			self:SetMinMaxValues(0, self.maxValue)
+			self:SetMinMaxValues(self.minValue, self.maxValue)
 			self:SetValue(self.value)
 			if (not self.Settings.DontUpdateAlpha) then
 				self:SetAlpha(1)
 			end
 			self.Icon:SetTexture(texture)
 			self.Icon:Show()
-			self.Text:SetText(text or name)
+			--self.Text:SetText(text or name)
+			self.Text:SetText(text)
 
 			if (self.Settings.ShowCastTime and self.Settings.CanLazyTick) then
 				self.percentText:Show()
@@ -1542,17 +1592,21 @@ detailsFramework.CastFrameFunctions = {
 
 			self.Spark:Show()
 			self:Show()
+			
+			self:SetReverseFill(false)
 
 		--update the interrupt cast border
 		self:UpdateInterruptState()
 	end,
 
 	UNIT_SPELLCAST_START = function(self, unit, ...)
+		self.startEventTime = GetTimePreciseSec() * 1000
 		self:UpdateCastingInfo(unit, ...)
 		self:RunHooksForWidget("OnCastStart", self, self.unit, "UNIT_SPELLCAST_START")
 	end,
 
 	CreateOrUpdateEmpoweredPips = function(self, unit, numStages, startTime, endTime)
+		if true then return end
 		unit = unit or self.unit
 		numStages = numStages or self.numStages
 		startTime = startTime or ((self.spellStartTime or 0) * 1000)
@@ -1599,9 +1653,10 @@ detailsFramework.CastFrameFunctions = {
 	UpdateChannelInfo = function(self, unit, ...)
 		local unitID, castID, spellID = ...
 		local name, text, texture, startTime, endTime, isTradeSkill, notInterruptible, uciSpellID, _, numStages = CastInfo.UnitChannelInfo (unit)
-		spellID = uciSpellID or spellID
-		castID = uciCastID or castID
+		spellID = uciSpellID --or spellID
+		castID = uciCastID --or castID
 		
+--[[
 		if spellID and (not name or not texture or not text) then
 			local siName, _, siIcon, siCastTime = GetSpellInfo(spellID)
 			texture = texture or siIcon
@@ -1655,25 +1710,27 @@ detailsFramework.CastFrameFunctions = {
 				self.curStage = nil
 				self.numStages = nil
 			end
-
+]]--
 		--setup cast
 			self.casting = nil
 			self.channeling = true
 			self.interrupted = nil
 			self.failed = nil
 			self.finished = nil
-			self.canInterrupt = not notInterruptible
+			self.canInterrupt = true --not notInterruptible
+			self.notInterruptible = notInterruptible
 			self.spellID = spellID
 			self.castID = castID
 			self.spellName = name
 			self.spellTexture = texture
-			self.spellStartTime = startTime / 1000
-			self.spellEndTime = endTime / 1000
-			self.value = self.empowered and (GetTime() - self.spellStartTime) or (self.spellEndTime - GetTime())
-			self.maxValue = self.spellEndTime - self.spellStartTime
+			self.spellStartTime = startTime --startTime / 1000
+			self.spellEndTime = endTime --endTime / 1000
+			self.value = GetTimePreciseSec() * 1000 --self.empowered and (GetTime() - self.spellStartTime) or (self.spellEndTime - GetTime())
+			self.minValue = startTime
+			self.maxValue = endTime --self.spellEndTime - self.spellStartTime
 			self.reverseChanneling = self.empowered
 
-			self:SetMinMaxValues(0, self.maxValue)
+			self:SetMinMaxValues(self.minValue, self.maxValue)
 			self:SetValue(self.value)
 
 			if (not self.Settings.DontUpdateAlpha) then
@@ -1703,6 +1760,8 @@ detailsFramework.CastFrameFunctions = {
 
 			self.Spark:Show()
 			self:Show()
+			
+			self:SetReverseFill(true)
 
 		--update the interrupt cast border
 		self:UpdateInterruptState()
@@ -1710,67 +1769,66 @@ detailsFramework.CastFrameFunctions = {
 	end,
 
 	UNIT_SPELLCAST_CHANNEL_START = function(self, unit, ...)
+		self.startEventTime = GetTimePreciseSec() * 1000
 		self:UpdateChannelInfo(unit, ...)
 		self:RunHooksForWidget("OnCastStart", self, self.unit, "UNIT_SPELLCAST_CHANNEL_START")
 	end,
 
 	UNIT_SPELLCAST_STOP = function(self, unit, ...)
 		local unitID, castID, spellID = ...
-		if (self.castID == castID) then
-			if (self.interrupted) then
-				if (self.Settings.HideSparkOnInterrupt) then
-					self.Spark:Hide()
-				end
-			else
+		if (self.interrupted) then
+			if (self.Settings.HideSparkOnInterrupt) then
 				self.Spark:Hide()
 			end
-
-			self.percentText:Hide()
-
-			local value = self:GetValue()
-			local _, maxValue = self:GetMinMaxValues()
-
-			if (self.interrupted) then
-				if (self.Settings.FillOnInterrupt) then
-					self:SetValue(self.maxValue or maxValue or 1)
-				end
-			else
-				self:SetValue(self.maxValue or maxValue or 1)
-			end
-
-			self.casting = nil
-			self.channeling = nil
-			self.finished = true
-			self.castID = nil
-
-			if (not self:HasScheduledHide()) then
-				--check if settings has no fade option or if its parents are not visible
-				if (not self:IsVisible()) then
-					self:Hide()
-
-				elseif (self.Settings.NoFadeEffects) then
-					self:ScheduleToHide (0.3)
-
-				else
-					self:Animation_Flash()
-					self:Animation_FadeOut()
-				end
-			end
-
-			self:UpdateCastColor()
+		else
+			self.Spark:Hide()
 		end
+
+		self.percentText:Hide()
+
+		local value = self:GetValue()
+		local _, maxValue = self:GetMinMaxValues()
+
+		if (self.interrupted) then
+			if (self.Settings.FillOnInterrupt) then
+				self:SetValue(maxValue)
+			end
+		else
+			self:SetValue(maxValue)
+		end
+
+		self.casting = nil
+		self.channeling = nil
+		self.finished = true
+		self.castID = nil
+
+		if (not self:HasScheduledHide()) then
+			--check if settings has no fade option or if its parents are not visible
+			if (not self:IsVisible()) then
+				self:Hide()
+
+			elseif (self.Settings.NoFadeEffects) then
+				self:ScheduleToHide (0.3)
+
+			else
+				self:Animation_Flash()
+				self:Animation_FadeOut()
+			end
+		end
+
+		self:UpdateCastColor()
 	end,
 
 	UNIT_SPELLCAST_CHANNEL_STOP = function(self, unit, ...)
 		local unitID, castID, spellID = ...
 
-		if (self.channeling and castID == self.castID) then
+		if (self.channeling) then --and castID == self.castID) then
 			self.Spark:Hide()
 			self.percentText:Hide()
 
 			local value = self:GetValue()
 			local _, maxValue = self:GetMinMaxValues()
-			self:SetValue(self.maxValue or maxValue or 1)
+			self:SetValue(maxValue)
 
 			self.casting = nil
 			self.channeling = nil
@@ -1810,13 +1868,15 @@ detailsFramework.CastFrameFunctions = {
 	UNIT_SPELLCAST_FAILED = function(self, unit, ...)
 		local unitID, castID, spellID = ...
 
-		if ((self.casting or self.channeling) and castID == self.castID and not self.fadeOut) then
+		--if ((self.casting or self.channeling) and castID == self.castID and not self.fadeOut) then
+		if ((self.casting or self.channeling) and not self.fadeOut) then
 			self.casting = nil
 			self.channeling = nil
 			self.failed = true
 			self.finished = true
 			self.castID = nil
-			self:SetValue(self.maxValue or select(2, self:GetMinMaxValues()) or 1)
+			local _, maxValue = self:GetMinMaxValues()
+			self:SetValue(maxValue)
 
 			--set the statusbar color
 			self:UpdateCastColor()
@@ -1832,7 +1892,7 @@ detailsFramework.CastFrameFunctions = {
 	UNIT_SPELLCAST_INTERRUPTED = function(self, unit, ...)
 		local unitID, castID, spellID = ...
 
-		if ((self.casting or self.channeling) and castID == self.castID and not self.fadeOut) then
+		if ((self.casting or self.channeling) and not self.fadeOut) then
 			self.casting = nil
 			self.channeling = nil
 			self.interrupted = true
@@ -1840,7 +1900,8 @@ detailsFramework.CastFrameFunctions = {
 			self.castID = nil
 
 			if (self.Settings.FillOnInterrupt) then
-				self:SetValue(self.maxValue or select(2, self:GetMinMaxValues()) or 1)
+				local _, maxValue = self:GetMinMaxValues()
+				self:SetValue(maxValue)
 			end
 
 			if (self.Settings.HideSparkOnInterrupt) then
@@ -1865,11 +1926,11 @@ detailsFramework.CastFrameFunctions = {
 		end
 
 		--update the cast time
-		self.spellStartTime = startTime / 1000
-		self.spellEndTime = endTime / 1000
-		self.value = GetTime() - self.spellStartTime
-		self.maxValue = self.spellEndTime - self.spellStartTime
-		self:SetMinMaxValues(0, self.maxValue)
+		self.spellStartTime = startTime --startTime / 1000
+		self.spellEndTime = endTime --endTime / 1000
+		self.value = GetTimePreciseSec() * 1000 --GetTime() - self.spellStartTime
+		self.maxValue = endTime --self.spellEndTime - self.spellStartTime
+		self:SetMinMaxValues(self.minValue, self.maxValue)
 	end,
 
 	UNIT_SPELLCAST_CHANNEL_UPDATE = function(self, unit, ...)
@@ -1880,16 +1941,17 @@ detailsFramework.CastFrameFunctions = {
 		end
 
 		--update the cast time
-		self.spellStartTime = startTime / 1000
-		self.spellEndTime = endTime / 1000
-		self.value = self.empowered and (GetTime() - self.spellStartTime) or (self.spellEndTime - GetTime())
-		self.maxValue = self.spellEndTime - self.spellStartTime
+		self.spellStartTime = startTime --startTime / 1000
+		self.spellEndTime = endTime --endTime / 1000
+		self.value = GetTimePreciseSec() * 1000 --self.empowered and (GetTime() - self.spellStartTime) or (self.spellEndTime - GetTime())
+		self.maxValue = startTime --self.spellEndTime - self.spellStartTime
 
+--[[
 		if (self.value < 0 or self.value > self.maxValue) then
 			self.value = 0
 		end
-
-		self:SetMinMaxValues(0, self.maxValue)
+]]--
+		self:SetMinMaxValues(self.minValue, self.maxValue)
 		self:SetValue(self.value)
 	end,
 
