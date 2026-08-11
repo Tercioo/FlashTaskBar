@@ -9,3 +9,6 @@ icons.blp
 mail.blp
 *.json
 CHANGES.txt
+*.jsonl
+*.py
+*.pyc

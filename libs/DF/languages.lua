@@ -726,6 +726,14 @@ local setObject_Text = function(addonNamespaceTable, object, phraseInfoTable, te
 
     local formattedText = getFormattedText(phraseInfoTable, text)
 
+    if (object.__iconString) then
+        if (object.__iconStringBefore) then
+            formattedText = object.__iconString .. formattedText
+        else
+            formattedText = formattedText .. object.__iconString
+        end
+    end
+
     object:SetText(formattedText)
 end
 
@@ -1127,7 +1135,7 @@ function DF.Language.SetFontByAlphabetOrRegion(addonId, latin, cyrillic, china, 
     if (korean) then
         local fontPath = korean
         if (type(fontPath) == "string") then
-            setFontForLanguageId(addonNamespaceTable, "zhTW", fontPath)
+            setFontForLanguageId(addonNamespaceTable, "koKR", fontPath)
         end
     end
 

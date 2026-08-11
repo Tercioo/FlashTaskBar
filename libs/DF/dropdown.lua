@@ -13,6 +13,7 @@
 
 ---@class df_dropdown : table, frame, df_widgets
 ---@field func function
+---@field GetUIObject fun(self:df_dropdown):frame returns the UIObject that is behind the wrapper table
 ---@field SetTemplate fun(self:df_dropdown, template:table|string)
 ---@field SetFixedParameter fun(self:df_dropdown, value:any) is sent as 2nd argument to the callback function, the value is the same no matter which option is selected
 ---@field GetFixedParameter fun(self:df_dropdown):any
@@ -40,6 +41,8 @@
 ---@field value any
 ---@field label string text shown in the dropdown option
 ---@field onclick fun(dropdownObject:table, fixedValue:any, value:any)? function to call when the option is selected
+---@field onenter fun(button:button, value:any)? function to call when the cursor enters this option row
+---@field onleave fun(button:button, value:any)? function to call when the cursor leaves this option row
 ---@field icon string|number? texture
 ---@field iconcolor any any color format
 ---@field iconsize number[]? width, height
@@ -101,50 +104,58 @@ DF:Mixin(DropDownMetaFunctions, DF.Language.LanguageMixin)
 		--unknown
 	end
 
+--[=[
+	set and get members using dot.
+	Example:
+		local myDropdown = DF:CreateDropdown(parent, func)
+		myDropdown.shown return true if the dropdown is shown
+		myDropdown.width adjust the width of the dropdown frame
+--]=]
+
 ------------------------------------------------------------------------------------------------------------
 --members
 	--selected value
-	local gmemberValue = function(object)
+	local gmemberValue = function(object) -- dropdown.value
 		return object:GetValue()
 	end
 
 	--tooltip
-	local gmemberTooltip = function(object)
+	local gmemberTooltip = function(object) -- dropdown.tooltip
 		return object:GetTooltip()
 	end
 
 	--shown
-	local gmemberShown = function(object)
+	local gmemberShown = function(object) -- dropdown.shown
 		return object:IsShown()
 	end
 
 	--frame width
-	local gmemberWidth = function(object)
+	local gmemberWidth = function(object) -- dropdown.width
 		return object.button:GetWidth()
 	end
 
 	--frame height
-	local gmemberHeight = function(object)
+	local gmemberHeight = function(object) -- dropdown.height
 		return object.button:GetHeight()
 	end
 
 	--current text
-	local gmemberText = function(object)
+	local gmemberText = function(object) -- dropdown.text
 		return object.label:GetText()
 	end
 
 	--menu creation function
-	local gmemberFunction = function(object)
+	local gmemberFunction = function(object) -- dropdown.func
 		return object:GetFunction()
 	end
 
 	--menu width
-	local gmemberMenuWidth = function(object)
+	local gmemberMenuWidth = function(object) -- dropdown.menuwidth
 		return rawget(object, "realsizeW")
 	end
 
 	--menu height
-	local gmemberMenuHeight = function(object)
+	local gmemberMenuHeight = function(object) -- dropdown.menuheight
 		return rawget(object, "realsizeH")
 	end
 
@@ -176,12 +187,12 @@ DF:Mixin(DropDownMetaFunctions, DF.Language.LanguageMixin)
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 	--tooltip
-	local smemberTooltip = function(object, value)
+	local smemberTooltip = function(object, value) -- dropdown.tooltip
 		return object:SetTooltip(value)
 	end
 
 	--show
-	local smemberShow = function(object, value)
+	local smemberShow = function(object, value) -- dropdown.show
 		if (value) then
 			return object:Show()
 		else
@@ -190,7 +201,7 @@ DF:Mixin(DropDownMetaFunctions, DF.Language.LanguageMixin)
 	end
 
 	--hide
-	local smemberHide = function(object, value)
+	local smemberHide = function(object, value) -- dropdown.hide
 		if (not value) then
 			return object:Show()
 		else
@@ -199,27 +210,27 @@ DF:Mixin(DropDownMetaFunctions, DF.Language.LanguageMixin)
 	end
 
 	--frame width
-	local smemberWidth = function(object, value)
+	local smemberWidth = function(object, value) -- dropdown.width
 		return object.dropdown:SetWidth(value)
 	end
 
 	--frame height
-	local smemberHeight = function(object, value)
+	local smemberHeight = function(object, value) -- dropdown.height
 		return object.dropdown:SetHeight(value)
 	end
 
 	--menu creation function
-	local smemberFunction = function(object, value)
+	local smemberFunction = function(object, value) -- dropdown.func
 		return object:SetFunction(value)
 	end
 
 	--menu width
-	local smemberMenuWidth = function(object, value)
+	local smemberMenuWidth = function(object, value) -- dropdown.menuwidth
 		object:SetMenuSize(value, nil)
 	end
 
 	--menu height
-	local smemberMenuHeight = function(object, value)
+	local smemberMenuHeight = function(object, value) -- dropdown.menuheight
 		object:SetMenuSize(nil, value)
 	end
 
@@ -244,12 +255,20 @@ DF:Mixin(DropDownMetaFunctions, DF.Language.LanguageMixin)
 
 ------------------------------------------------------------------------------------------------------------
 
+---return the UIObject that is behind the wrapper table.
+---@param self df_dropdown
+---@return frame
+function DropDownMetaFunctions:GetUIObject()
+	return self.widget
+end
+
 function DropDownMetaFunctions:IsText()
 	return self.isText or false
 end
 
 
 --menu width and height
+--example: Set the menu size to 451x500: dropdown:SetMenuSize(451, 500)
 	function DropDownMetaFunctions:SetMenuSize(width, height)
 		if (width) then
 			rawset(self, "realsizeW", width)
@@ -259,11 +278,13 @@ end
 		end
 	end
 
+--get menu width and height
 	function DropDownMetaFunctions:GetMenuSize()
 		return rawget(self, "realsizeW"), rawget(self, "realsizeH")
 	end
 
 --function
+--the function that creates the menu options, example: dropdown:SetFunction(function(self) return {} end)
 	function DropDownMetaFunctions:SetFunction(func)
 		return rawset(self, "func", func)
 	end
@@ -272,7 +293,8 @@ end
 		return rawget(self, "func")
 	end
 
---value
+--set the selected value in the dropdown
+--normally the value is set when selecting an option in the dropdown, use: dropdown:SetValue(value) to manually select
 	function DropDownMetaFunctions:GetValue()
 		return rawget(self, "myvalue")
 	end
@@ -282,6 +304,7 @@ end
 	end
 
 --frame levels
+--usage: set the frame level to +3 relative to UIParent: dropdown:SetFrameLevel(3, UIParent)
 	function DropDownMetaFunctions:SetFrameLevel(level, frame)
 		if (not frame) then
 			return self.dropdown:SetFrameLevel(level)
@@ -292,10 +315,12 @@ end
 	end
 
 --enabled
+--is the dropdown enabled?: dropdown:IsEnabled(); use dropdown:Disable() and dropdown:Enable() to change the state
 	function DropDownMetaFunctions:IsEnabled()
 		return self.dropdown:IsEnabled()
 	end
 
+--enabled the dropdown: dropdown:Enable()
 	function DropDownMetaFunctions:Enable()
 		self:SetAlpha(1)
 		rawset(self, "lockdown", false)
@@ -309,6 +334,7 @@ end
 		end
 	end
 
+--disable the dropdown: dropdown:Disable()
 	function DropDownMetaFunctions:Disable()
 		self:SetAlpha(.4)
 		rawset(self, "lockdown", true)
@@ -322,7 +348,7 @@ end
 		end
 	end
 
---fixed value
+--fixed value, is a value that is set by dropdown:SetFixedParameter(any) and is sent as 2nd argument to the callback function of the options, the value is the same no matter which option is selected
 	function DropDownMetaFunctions:SetFixedParameter(value)
 		rawset(self, "FixedValue", value)
 	end
@@ -348,12 +374,14 @@ local isOptionVisible = function(self, thisOption)
 end
 
 --return a table containing all frames of options in the menu
+--get frames used in the menu of the dropdown: dropdown:GetMenuFrames()
 function DropDownMetaFunctions:GetMenuFrames() --not tested
 	if (self.MyObject) then
 		self = self.MyObject
 	end
 	return self.menus
 end
+
 
 function DropDownMetaFunctions:GetFrameForOption(optionsTable, value) --not tested
 	if (self.MyObject) then
@@ -373,11 +401,12 @@ function DropDownMetaFunctions:GetFrameForOption(optionsTable, value) --not test
 	end
 end
 
+--rebuild the options menu, options are dynamic and may change, example: refresh the dropdown: dropdown:Refresh()
 function DropDownMetaFunctions:Refresh()
 	assert(type(self.func) == "function", "Dropdown without options initializator function, check 2nd parameter (function) on CreateDropdown().")
 	local state, optionsTable = xpcall(self.func, geterrorhandler(), self)
 
-	if (#optionsTable == 0) then
+	if (type(optionsTable) ~= "table" or #optionsTable == 0) then
 		self:NoOption(true)
 		self.no_options = true
 		return false
@@ -392,6 +421,7 @@ function DropDownMetaFunctions:Refresh()
 	return true
 end
 
+--this is called internally and isn't a user api
 function DropDownMetaFunctions:NoOptionSelected()
 	if (self.no_options) then
 		return
@@ -412,12 +442,23 @@ function DropDownMetaFunctions:NoOptionSelected()
 	self.last_select = nil
 end
 
+--customize the text shown when the dropdown has zero options
+--example: dropdown:SetNoOptionsText("No profiles available")
+---@param text string
+function DropDownMetaFunctions:SetNoOptionsText(text)
+	self.no_options_text = text
+	if (self.no_options) then
+		self.label:SetText(text)
+	end
+end
+
+--this is called internally and isn't a user api
 function DropDownMetaFunctions:NoOption(state)
 	if (state) then
 		self:Disable()
 		self:SetAlpha(0.5)
 		self.no_options = true
-		self.label:SetText("no options")
+		self.label:SetText(self.no_options_text or "no options")
 		self.label:SetPoint("left", self.icon, "right", 2, 0)
 		self.label:SetTextColor(1, 1, 1, 0.4)
 		self.icon:SetTexture([[Interface\CHARACTERFRAME\UI-Player-PlayTimeUnhealthy]])
@@ -451,12 +492,15 @@ local canRunCallbackFunctionForOption = function(canRunCallback, optionTable, dr
 	end
 end
 
+--set the selected value in the dropdown after a short delay
+--example: select the option "option name" on the dropdown aftert a small delay: dropdown:SelectDelayed("option name", false, false, true)
 function DropDownMetaFunctions:SelectDelayed(optionName, byOptionNumber, bOnlyShown, runCallback)
 	DF.Schedules.After(DF.Math.RandomFraction(0.016, 0.3), function()
 		self:Select(optionName, byOptionNumber, bOnlyShown, runCallback)
 	end)
 end
 
+--set the selected value in the dropdown, example: select the option "option name" on the dropdown: dropdown:Select("option name", false, false, true)
 ---if bOnlyShown is true it'll first create a table with visible options that has .shown and then select in this table the index passed (if byOptionNumber)
 ---@param optionName string value or string shown in the name of the option
 ---@param byOptionNumber number the option name is considered a number and selects the index of the menu
@@ -543,6 +587,9 @@ function DropDownMetaFunctions:Select(optionName, byOptionNumber, bOnlyShown, ru
 	return false
 end
 
+--when there is no option, an icon and text is shown in the dropdown
+--this function set a new text and a new icon
+--example: set the empty text and icon of the dropdown: dropdown:SetEmptyTextAndIcon("no options available", "Interface\\COMMON\\UI-ModelControlPanel")
 function DropDownMetaFunctions:SetEmptyTextAndIcon(text, icon)
 	if (text) then
 		self.empty_text = text
@@ -675,7 +722,23 @@ function DropDownMetaFunctions:Selected(thisOption)
 		self.label:SetFont(thisOption.font, 10)
 
 	else
-		self.label:SetFont("GameFontHighlightSmall", 10)
+		if (self.__languageAddonId) then
+			local languageId = DF.Language.GetLanguageIdForAddonId(self.__languageAddonId)
+			local font = DF.Language.GetFontForLanguageID(languageId)
+			local _, _, flags = self.label:GetFont()
+			if DF.IsMidnightWowAPI() then
+				DF:SetFont(self.label, font, 10, flags)
+			else
+				self.label:SetFont(font, 10, flags)
+			end
+		else
+			if DF.IsMidnightWowAPI() then
+				local fontFace, fontSize, fontFlags = GameFontHighlightSmall:GetFont()
+				DF:SetFont(self.label, fontFace, fontSize, fontFlags)
+			else
+				self.label:SetFont("GameFontHighlightSmall", 10)
+			end
+		end
 	end
 
 	self:SetValue(thisOption.value)
@@ -775,6 +838,10 @@ function DetailsFrameworkDropDownOptionOnEnter(self)
 
 	self:GetParent().mouseover:SetPoint("left", self)
 	self:GetParent().mouseover:Show()
+
+	if (self.table.onenter) then
+		self.table.onenter(self, self.table.value)
+	end
 end
 
 --on leave an option on the menu dropdown
@@ -783,6 +850,10 @@ function DetailsFrameworkDropDownOptionOnLeave(frame)
 		GameCooltip2:ShowMe(false)
 	end
 	frame:GetParent().mouseover:Hide()
+
+	if (frame.table.onleave) then
+		frame.table.onleave(frame, frame.table.value)
+	end
 end
 
 
@@ -819,7 +890,7 @@ function DetailsFrameworkDropDownOnMouseDown(button, buttontype)
 			end
 
 			for tindex, thisOption in ipairs(optionsTable) do
-				local bIsOptionVisible = isOptionVisible(button, thisOption)
+				local bIsOptionVisible = isOptionVisible(object, thisOption)
 
 				---@cast thisOption dropdownoption
 
@@ -930,7 +1001,9 @@ function DetailsFrameworkDropDownOnMouseDown(button, buttontype)
 						thisOptionFrame.label:SetFont(thisOption.font, 10.5)
 
 					else
-						thisOptionFrame.label:SetFont("GameFontHighlightSmall", 10.5)
+						thisOptionFrame.label:SetFontObject(_G["GameFontHighlightSmall"])
+						local font, _, flags = thisOptionFrame.label:GetFont()
+						thisOptionFrame.label:SetFont(font, 10.5, flags)
 					end
 
 					if (currentText and currentText == thisOption.label) then
@@ -1285,6 +1358,13 @@ function DF:CreateOutlineListGenerator(callback)
 		for index, outlineInfo in pairs(DF.FontOutlineFlags) do
 			local outlineValue = outlineInfo[1]
 			local outlineName = outlineInfo[2]
+
+			if DF:IsAddonApocalypseWow() then
+				if outlineValue == "None" or outlineValue == "NONE" then
+					outlineValue = ""
+				end
+			end
+
 			table.insert(dropdownOptions, {
 				label = outlineName,
 				value = outlineValue,
@@ -1425,6 +1505,41 @@ function DF:CreateStatusbarTextureListGenerator(callback)
 	return newGenerator
 end
 
+---build a table with all background textures available from LibSharedMedia-3.0, ready to be consumed by a dropdown
+---each option uses the texture as its row background (statusbar field) so the user previews each texture before selecting
+---@param onClick function callback fired on option select: onClick(dropdownObject, fixedValue, backgroundName)
+---@param bIncludeDefault boolean? if true, prepends a "DEFAULT" option with an empty texture path
+---@return table dropdownOptions sorted alphabetically by background name
+function DF:BuildDropDownBackgroundList(onClick, bIncludeDefault)
+	local backgroundTable = {}
+
+	local SharedMedia = LibStub:GetLibrary("LibSharedMedia-3.0")
+	for name, texturePath in pairs(SharedMedia:HashTable("background")) do
+		backgroundTable[#backgroundTable+1] = {
+			value = name,
+			label = name,
+			onclick = onClick,
+			statusbar = texturePath,
+		}
+	end
+
+	table.sort(backgroundTable, function(t1, t2) return t1.label < t2.label end)
+
+	if (bIncludeDefault) then
+		table.insert(backgroundTable, 1, {value = "DEFAULT", label = "DEFAULT", onclick = onClick, statusbar = ""})
+	end
+
+	return backgroundTable
+end
+
+---return a function which when called returns a table filled with all background textures available and ready to be used on dropdowns
+---@param callback function
+---@param bIncludeDefault boolean?
+---@return function
+function DF:CreateBackgroundListGenerator(callback, bIncludeDefault)
+	return function() return DF:BuildDropDownBackgroundList(callback, bIncludeDefault) end
+end
+
 ---create a list generator for frame strata
 ---@param callback function
 ---@return function
@@ -1446,7 +1561,8 @@ function DF:CreateFrameStrataListGenerator(callback)
 	return newGenerator
 end
 
----create a dropdown object with a list of fonts
+---create a dropdown object with a list of fonts.
+---Returns a wrapper table (not a frame); unwrap via `wrapper:GetUIObject()` / `wrapper.widget` when handing to a Blizzard API (see CreateDropDown for the full wrapper-vs-UIObject contract).
 ---@param parent frame
 ---@param callback function
 ---@param default any
@@ -1456,13 +1572,15 @@ end
 ---@param name string?
 ---@param template table?
 ---@param bIncludeDefault boolean?
+---@return df_dropdown
 function DF:CreateFontDropDown(parent, callback, default, width, height, member, name, template, bIncludeDefault)
 	local func = DF:CreateFontListGenerator(callback, bIncludeDefault)
 	local dropDownObject = DF:NewDropDown(parent, parent, name, member, width, height, func, default, template)
 	return dropDownObject
 end
 
----create a dropdown object with a list of status bar textures from SharedMedia library
+---create a dropdown object with a list of status bar textures from SharedMedia library.
+---Returns a wrapper table (not a frame); unwrap via `wrapper:GetUIObject()` / `wrapper.widget` when handing to a Blizzard API (see CreateDropDown for the full wrapper-vs-UIObject contract).
 ---@param parent frame
 ---@param callback function
 ---@param default any
@@ -1478,7 +1596,9 @@ function DF:CreateStatusbarTextureDropDown(parent, callback, default, width, hei
 	return dropDownObject
 end
 
----create a dropdown object with a list of frame strata
+---create a dropdown object with a list of background textures from SharedMedia library.
+---Each option uses its texture as the row background so the user previews each texture in the open menu.
+---Returns a wrapper table (not a frame); unwrap via `wrapper:GetUIObject()` / `wrapper.widget` when handing to a Blizzard API (see CreateDropDown for the full wrapper-vs-UIObject contract).
 ---@param parent frame
 ---@param callback function
 ---@param default any
@@ -1487,36 +1607,70 @@ end
 ---@param member string?
 ---@param name string?
 ---@param template table?
+---@param bIncludeDefault boolean? if true, prepends a "DEFAULT" option
+---@return df_dropdown
+function DF:CreateBackgroundDropDown(parent, callback, default, width, height, member, name, template, bIncludeDefault)
+	local func = DF:CreateBackgroundListGenerator(callback, bIncludeDefault)
+	local dropDownObject = DF:NewDropDown(parent, parent, name, member, width, height, func, default, template)
+	return dropDownObject
+end
+
+---create a dropdown object with a list of frame strata.
+---Returns a wrapper table (not a frame); unwrap via `wrapper:GetUIObject()` / `wrapper.widget` when handing to a Blizzard API (see CreateDropDown for the full wrapper-vs-UIObject contract).
+---@param parent frame
+---@param callback function
+---@param default any
+---@param width number?
+---@param height number?
+---@param member string?
+---@param name string?
+---@param template table?
+---@return df_dropdown
 function DF:CreateFrameStrataDropDown(parent, callback, default, width, height, member, name, template)
 	local func = DF:CreateFrameStrataListGenerator(callback)
 	local dropDownObject = DF:NewDropDown(parent, parent, name, member, width, height, func, default, template)
 	return dropDownObject
 end
 
+---create a dropdown object with a list of preset colors.
+---Returns a wrapper table (not a frame); unwrap via `wrapper:GetUIObject()` / `wrapper.widget` when handing to a Blizzard API (see CreateDropDown for the full wrapper-vs-UIObject contract).
+---@return df_dropdown
 function DF:CreateColorDropDown(parent, callback, default, width, height, member, name, template)
 	local func = DF:CreateColorListGenerator(callback)
 	local dropDownObject = DF:NewDropDown(parent, parent, name, member, width, height, func, default, template)
 	return dropDownObject
 end
 
+---create a dropdown object with a list of text outline styles.
+---Returns a wrapper table (not a frame); unwrap via `wrapper:GetUIObject()` / `wrapper.widget` when handing to a Blizzard API (see CreateDropDown for the full wrapper-vs-UIObject contract).
+---@return df_dropdown
 function DF:CreateOutlineDropDown(parent, callback, default, width, height, member, name, template)
 	local func = DF:CreateOutlineListGenerator(callback)
 	local dropDownObject = DF:NewDropDown(parent, parent, name, member, width, height, func, default, template)
 	return dropDownObject
 end
 
+---create a dropdown object with a list of anchor points (topleft, top, topright, etc.).
+---Returns a wrapper table (not a frame); unwrap via `wrapper:GetUIObject()` / `wrapper.widget` when handing to a Blizzard API (see CreateDropDown for the full wrapper-vs-UIObject contract).
+---@return df_dropdown
 function DF:CreateAnchorPointDropDown(parent, callback, default, width, height, member, name, template)
 	local func = DF:CreateAnchorPointListGenerator(callback)
 	local dropDownObject = DF:NewDropDown(parent, parent, name, member, width, height, func, default, template)
 	return dropDownObject
 end
 
+---create a dropdown object with a list of audio files from SharedMedia library.
+---Returns a wrapper table (not a frame); unwrap via `wrapper:GetUIObject()` / `wrapper.widget` when handing to a Blizzard API (see CreateDropDown for the full wrapper-vs-UIObject contract).
+---@return df_dropdown
 function DF:CreateAudioDropDown(parent, callback, default, width, height, member, name, template)
 	local func = DF:CreateAudioListGenerator(callback)
 	local dropDownObject = DF:NewDropDown(parent, parent, name, member, width, height, func, default, template)
 	return dropDownObject
 end
 
+---create a dropdown object with a list of raid instances (current content).
+---Returns a wrapper table (not a frame); unwrap via `wrapper:GetUIObject()` / `wrapper.widget` when handing to a Blizzard API (see CreateDropDown for the full wrapper-vs-UIObject contract).
+---@return df_dropdown
 function DF:CreateRaidInstanceSelectorDroDown(parent, callback, default, width, height, member, name, template)
 	local func = DF:CreateRaidInstanceListGenerator(callback)
 
@@ -1548,6 +1702,9 @@ local setInstance = function(self, instanceId)
 	self:Refresh()
 end
 
+---create a dropdown object with a list of bosses for a given raid instance.
+---Returns a wrapper table (df_dropdown_bossselector, extends df_dropdown); unwrap via `wrapper:GetUIObject()` / `wrapper.widget` when handing to a Blizzard API (see CreateDropDown for the full wrapper-vs-UIObject contract).
+---@return df_dropdown_bossselector
 function DF:CreateBossSelectorDroDown(parent, callback, instanceId, default, width, height, member, name, template)
 	local func = DF:CreateBossListGenerator(callback, instanceId)
 	local dropdown = DF:NewDropDown(parent, parent, name, member, width, height, func, default, template)
@@ -1617,7 +1774,23 @@ local dropdownWithTextFunctions = {
 ---@field SetOnPressEnterFunction fun(self:df_dropdown_text, func:function)
 ---@field GetTextEntry fun(self:df_dropdown_text):df_textentry
 
+---create a dropdown object that also has an editable text entry overlaid on the button face.
+---This function returns a wrapper Lua table (df_dropdown_text, extends df_dropdown), NOT a Blizzard
+---frame. The underlying UIObject is at `wrapper.widget` (or `wrapper.dropdown`) and via
+---`wrapper:GetUIObject()`. Pass the unwrapped frame to any Blizzard API that expects a real frame
+---(SetPoint relative anchor, CreateFrame parent, GameTooltip:SetOwner, secure-template ref, etc.);
+---method calls on the wrapper itself are fine because the metatable forwards them.
+---@param parent frame
+---@param func function
+---@param default any
+---@param width number?
+---@param height number?
+---@param member string?
+---@param name string?
+---@param template table?
+---@return df_dropdown_text
 function DF:CreateDropDownWithText(parent, func, default, width, height, member, name, template)
+	--returns a wrapper table (not a frame); unwrap via wrapper:GetUIObject() / wrapper.widget when handing to Blizzard APIs
 	---@type df_dropdown_text
 	local dropDownObject = DF:NewDropDown(parent, parent, name, member, width, height, func, default, template)
 	dropDownObject.isText = true
@@ -1666,7 +1839,15 @@ function DF:CreateDropDownWithText(parent, func, default, width, height, member,
 	return dropDownObject
 end
 
----create a dropdown object
+---create a dropdown object.
+---This function returns a wrapper Lua table, NOT a Blizzard frame. The underlying UIObject (the
+---Blizzard button frame backing the dropdown) is accessible at `wrapper.widget` (or equivalently
+---`wrapper.dropdown`) and via `wrapper:GetUIObject()`. Method calls on the wrapper itself are fine
+---(the metatable forwards them), but when the wrapper is passed AS AN ARGUMENT to a Blizzard API
+---that expects a frame — e.g. as a `SetPoint` relative anchor, a `CreateFrame` parent, a
+---`GameTooltip:SetOwner` target, or a secure-template ref — it MUST be unwrapped via
+---`wrapper:GetUIObject()` first, otherwise the C side will error or misbehave because the wrapper
+---has no frame userdata.
 ---@param parent frame
 ---@param func function
 ---@param default any
@@ -1677,6 +1858,7 @@ end
 ---@param template table?
 ---@return df_dropdown
 function DF:CreateDropDown(parent, func, default, width, height, member, name, template)
+	--returns a wrapper table (not a frame); unwrap via wrapper:GetUIObject() / wrapper.widget when handing to Blizzard APIs
 	return DF:NewDropDown(parent, parent, name, member, width, height, func, default, template)
 end
 

@@ -34,17 +34,6 @@ detailsFramework.Schedules.AfterCombatSchedules = {
 ---@field AfterById fun(time: number, callback: function, id: any, ...: any): timer cancel the existing timer with same id and start it again
 ---@field AfterByIdNoCancel fun(time: number, callback: function, id: any, ...: any): timer block all sub sequent calls with the same id until the timer is finished
 
----@class df_looper : table
----@field payload table
----@field callback function
----@field loopEndCallback function?
----@field checkPointCallback function?
----@field nextCheckPoint number
----@field lastLoop number
----@field currentLoop number
----@field Cancel fun()
----@field IsCancelled fun(): boolean
-
 local eventFrame = CreateFrame("frame")
 eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 eventFrame:SetScript("OnEvent", function(self, event)
@@ -91,8 +80,6 @@ local triggerScheduledLoop = function(tickerObject)
         end
     end
 
-    tickerObject.currentLoop = tickerObject.currentLoop + 1
-
     if (tickerObject.currentLoop == tickerObject.lastLoop) then
         tickerObject:Cancel()
         if (tickerObject.loopEndCallback) then
@@ -100,9 +87,22 @@ local triggerScheduledLoop = function(tickerObject)
         end
     end
 
+    tickerObject.currentLoop = tickerObject.currentLoop + 1
+
     return result
 end
 
+---looper class
+---@class df_looper : table
+---@field payload table
+---@field callback function
+---@field loopEndCallback function?
+---@field checkPointCallback function?
+---@field nextCheckPoint number
+---@field lastLoop number
+---@field currentLoop number
+---@field Cancel fun()
+---@field IsCancelled fun(): boolean
 ---start a loop which will tick @loopAmount of times, then call @loopEndCallback if exists
 ---checkPointCallback will be called every time the loop ticks, if it returns false, the loop will be cancelled
 ---@param time number
