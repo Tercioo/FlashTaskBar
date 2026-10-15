@@ -416,9 +416,9 @@ function FlashTaskBar.OnInit (self)
 	--low health
 	FlashTaskBar.LastHealthBlink = time() - 30
 	function FlashTaskBar.CheckTargetHealth()
-		local targetHealth = UnitHealth ("target")
-		if (targetHealth > 1) then
-			local targetMaxHealth = UnitHealthMax ("target")
+		local targetHealth = UnitHealth("target")
+		if (not issecretvalue or not issecretvalue(targetHealth)) and targetHealth > 1 then
+			local targetMaxHealth = UnitHealthMax("target")
 			if (targetMaxHealth) then
 				if (FlashTaskBar.db.profile.low_health) then
 					local percent = targetHealth / targetMaxHealth
@@ -529,9 +529,8 @@ function FlashTaskBar.OnInit (self)
 
 	--> player died
 	local healthFrame = CreateFrame ("frame", nil, UIParent)
-	healthFrame:SetScript ("OnEvent", function (self, unit)
-		local health = UnitHealth ("player")
-		if (health < 1) then
+	healthFrame:SetScript ("OnEvent", function()
+		if (UnitIsDeadOrGhost ("player")) then
 			if (FlashTaskBar.db.profile.player_died) then
 				FlashTaskBar:DoFlash ("player_died")
 			end
@@ -539,11 +538,11 @@ function FlashTaskBar.OnInit (self)
 	end)
 
 	function FlashTaskBar:EnablePlayerHealthMonitor()
-		healthFrame:RegisterUnitEvent ("UNIT_HEALTH", "player")
+		healthFrame:RegisterEvent ("PLAYER_DEAD")
 	end
 
 	function FlashTaskBar:DisablePlayerHealthMonitor()
-		healthFrame:UnregisterEvent ("UNIT_HEALTH", "player")
+		healthFrame:UnregisterEvent ("PLAYER_DEAD")
 	end
 
 	if (FlashTaskBar.db.profile.player_died) then
