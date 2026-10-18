@@ -103,6 +103,21 @@ local ChatFrame_MessageEventHandler_Original = ChatFrame_MessageEventHandler
 
 FlashTaskBar.last_flash = 0
 
+--values returned by the game api can be secret (unreadable by addons) on retail 12.0+
+local isSecret = function(value)
+	return issecretvalue and issecretvalue(value) or false
+end
+
+--hook a global function only if it exists in this version of the game
+local safeHook = function(funcName, callback)
+	if (type(_G[funcName]) == "function") then
+		hooksecurefunc(funcName, callback)
+	end
+end
+
+--the combat log cannot be read by addons on retail 12.0+
+local canReadCombatLog = not DF.IsAddonApocalypseWow() and CombatLogGetCurrentEventInfo ~= nil
+
 function FlashTaskBar:DoFlash (config_key)
 
 	if (FlashTaskBar.last_flash + 5 < GetTime()) then
@@ -132,8 +147,7 @@ function FlashTaskBar.OnInit (self)
 			return
 		end
 
-		InterfaceOptionsFrame_OpenToCategory ("FlashTaskBar")
-		InterfaceOptionsFrame_OpenToCategory ("FlashTaskBar")
+		FlashTaskBar:OpenInterfaceProfile()
 	end
 
 	--invite
@@ -180,6 +194,7 @@ function FlashTaskBar.OnInit (self)
 	FlashTaskBar:RegisterEvent ("PET_BATTLE_QUEUE_STATUS")
 
 	function FlashTaskBar:UPDATE_BATTLEFIELD_STATUS()
+		FlashTaskBar:CheckBattlefieldReady()
 		if (FlashTaskBar.db.profile.battleground_end) then
 			if (WorldStateScoreFrame and WorldStateScoreFrame:IsShown()) then
 				FlashTaskBar:DoFlash("battleground_end")
@@ -189,32 +204,43 @@ function FlashTaskBar.OnInit (self)
 	FlashTaskBar:RegisterEvent ("UPDATE_BATTLEFIELD_STATUS")
 
 	--premade groups ready
-	if (not DetailsFramework.IsTimewalkWoW()) then
-		hooksecurefunc ("LFGListInviteDialog_Show", function()
-			if (FlashTaskBar.db.profile.group_queue) then
-				FlashTaskBar:DoFlash("group_queue")
-				FlashTaskBar.last_flash = 0
-			end
-		end)
+	safeHook ("LFGListInviteDialog_Show", function()
+		if (FlashTaskBar.db.profile.group_queue) then
+			FlashTaskBar:DoFlash("group_queue")
+			FlashTaskBar.last_flash = 0
+		end
+	end)
 
-		--lfg lfpvp windows
-		hooksecurefunc ("LFGDungeonReadyStatus_ResetReadyStates", function()
-			if (FlashTaskBar.db.profile.group_queue) then
-				FlashTaskBar:DoFlash("group_queue")
-				FlashTaskBar.last_flash = 0
-			end
-		end)
+	--lfg lfpvp windows
+	safeHook ("LFGDungeonReadyStatus_ResetReadyStates", function()
+		if (FlashTaskBar.db.profile.group_queue) then
+			FlashTaskBar:DoFlash("group_queue")
+			FlashTaskBar.last_flash = 0
+		end
+	end)
 
-		hooksecurefunc ("PVPReadyDialog_Display", function()
-			if (FlashTaskBar.db.profile.arena_queue) then
+	safeHook ("PVPReadyDialog_Display", function()
+		if (FlashTaskBar.db.profile.arena_queue) then
+			FlashTaskBar:DoFlash("arena_queue")
+			FlashTaskBar.last_flash = 0
+		end
+	end)
+
+	--battleground ready on clients without the dialog above
+	function FlashTaskBar:CheckBattlefieldReady()
+		if (not FlashTaskBar.db.profile.arena_queue or not GetMaxBattlefieldID or type(_G.PVPReadyDialog_Display) == "function") then
+			return
+		end
+		for i = 1, GetMaxBattlefieldID() do
+			if (GetBattlefieldStatus(i) == "confirm") then
 				FlashTaskBar:DoFlash("arena_queue")
-				FlashTaskBar.last_flash = 0
+				return
 			end
-		end)
+		end
 	end
 
 	--general alerts
-	hooksecurefunc ("StaticPopup_Show", function (token, text_arg1, text_arg2, data, insertedFrame)
+	safeHook ("StaticPopup_Show", function (token, text_arg1, text_arg2, data, insertedFrame)
 		if (token == "BFMGR_INVITED_TO_ENTER") then --> generic world pvp alert
 			if (FlashTaskBar.db.profile.worldpvp) then
 				FlashTaskBar:DoFlash("worldpvp")
@@ -253,6 +279,9 @@ function FlashTaskBar.OnInit (self)
 
 	--brawlers guild
 	function FlashTaskBar:CHAT_MSG_MONSTER_YELL (event, msg, source, _, _, player_name)
+		if (isSecret(player_name)) then
+			return
+		end
 		if (player_name == UnitName ("player")) then
 			if (FlashTaskBar.db.profile.brawlers_queue) then
 				FlashTaskBar:DoFlash("brawlers_queue")
@@ -354,7 +383,7 @@ function FlashTaskBar.OnInit (self)
 
 	--disconenct
 	--don't run this line on wow 11
-	if (DF.IsDragonflightOrBelow()) then
+	if (DF.IsDragonflightOrBelow() and GameMenuButtonLogout) then
 		GameMenuButtonLogout:HookScript ("OnClick", function()
 			FlashTaskBar.LogoutTolerance = GetTime()+30
 		end)
@@ -382,9 +411,11 @@ function FlashTaskBar.OnInit (self)
 	--bags full
 	function FlashTaskBar:BAG_UPDATE()
 		if (FlashTaskBar.db.profile.bags_full) then
+			local getNumSlots = C_Container and C_Container.GetContainerNumSlots or GetContainerNumSlots
+			local getItemID = C_Container and C_Container.GetContainerItemID or GetContainerItemID
 			for backpack = 0, 4 do
-				for slot = 1, C_Container.GetContainerNumSlots (backpack) do
-					local itemId = C_Container.GetContainerItemID (backpack, slot)
+				for slot = 1, getNumSlots (backpack) do
+					local itemId = getItemID (backpack, slot)
 					if (not itemId) then
 						return
 					end
@@ -417,9 +448,9 @@ function FlashTaskBar.OnInit (self)
 	FlashTaskBar.LastHealthBlink = time() - 30
 	function FlashTaskBar.CheckTargetHealth()
 		local targetHealth = UnitHealth("target")
-		if (not issecretvalue or not issecretvalue(targetHealth)) and targetHealth > 1 then
+		if (not isSecret(targetHealth)) and targetHealth and targetHealth > 1 then
 			local targetMaxHealth = UnitHealthMax("target")
-			if (targetMaxHealth) then
+			if (targetMaxHealth and not isSecret(targetMaxHealth) and targetMaxHealth > 0) then
 				if (FlashTaskBar.db.profile.low_health) then
 					local percent = targetHealth / targetMaxHealth
 					if (percent < 0.17) then
@@ -462,6 +493,9 @@ function FlashTaskBar.OnInit (self)
 
 	local player_name = lower (UnitName ("player"))
 	local do_chat_scan = function (_, message)
+		if (type(message) ~= "string" or isSecret(message)) then
+			return
+		end
 		message = lower (message)
 		if (FlashTaskBar.db.profile.chat_scan) then
 			for _, keyword in ipairs (FlashTaskBar.db.profile.chat_scan_keywords) do
@@ -569,7 +603,7 @@ function FlashTaskBar.OnInit (self)
 	local combat_log_keywords = {}
 	local do_combat_log_scan = function (self, event)
 		local time, token, hidding, who_serial, who_name, who_flags, who_flags2, target_serial, target_name, target_flags, target_flags2 = CombatLogGetCurrentEventInfo()
-		if (target_name and combat_log_keywords [lower (target_name)]) then
+		if (target_name and not isSecret(target_name) and combat_log_keywords [lower (target_name)]) then
 			FlashTaskBar:DoFlash("combat_log")
 		end
 	end
@@ -582,11 +616,17 @@ function FlashTaskBar.OnInit (self)
 	end
 
 	function FlashTaskBar:EnableCombatLogScan()
+		if (not canReadCombatLog) then
+			return
+		end
 		FlashTaskBar:RegisterEvent ("COMBAT_LOG_EVENT_UNFILTERED", do_combat_log_scan)
 		FlashTaskBar:BuildCombatLogKeywordTable()
 	end
 
 	function FlashTaskBar:DisableCombatLogScan()
+		if (not canReadCombatLog) then
+			return
+		end
 		FlashTaskBar:UnregisterEvent ("COMBAT_LOG_EVENT_UNFILTERED")
 	end
 
@@ -626,11 +666,15 @@ function FlashTaskBar.OnInit (self)
 		--]=]
 		-----------------------
 
+		local currentMapId = C_Map and C_Map.GetBestMapForUnit ("player")
 		for _, vignetteID in ipairs (C_VignetteInfo.GetVignettes()) do
 			local vignetteInfo = C_VignetteInfo.GetVignetteInfo (vignetteID)
+			if (vignetteInfo and (isSecret(vignetteInfo.atlasName) or isSecret(vignetteInfo.objectGUID) or isSecret(vignetteInfo.name))) then
+				vignetteInfo = nil
+			end
 
 			--special event on icecrown map 9.0.1 event
-			if (vignetteInfo and C_Map.GetBestMapForUnit ("player") == 118) then
+			if (vignetteInfo and currentMapId == 118) then
 				local objectIcon = vignetteInfo.atlasName
 				if (objectIcon == "nazjatar-nagaevent") then
 					FlashTaskBar:DoFlash ("rare_scan")
@@ -664,28 +708,14 @@ function FlashTaskBar.OnInit (self)
 	end
 
 	function FlashTaskBar:EnableRareMobScan()
-		if (not DetailsFramework.IsTimewalkWoW()) then
+		if (C_VignetteInfo and C_VignetteInfo.GetVignettes) then
 			FlashTaskBar:RegisterEvent ("VIGNETTES_UPDATED", do_rare_mob_scan)
 		end
 	end
 
 	function FlashTaskBar:DisableRareMobScan()
-		if (not DetailsFramework.IsTimewalkWoW()) then
+		if (C_VignetteInfo and C_VignetteInfo.GetVignettes) then
 			FlashTaskBar:UnregisterEvent ("VIGNETTES_UPDATED")
-		end
-	end
-
---> overrides
-	--replace the built-in flash function from the game client to flash when the player enters in combat
-	if (LowHealthFrame) then
-		function LowHealthFrame:SetInCombat(inCombat)
-			if self.inCombat ~= inCombat then
-				self.inCombat = inCombat;
-				if ( self.inCombat ) then
-					--FlashClientIcon();
-				end
-				self:EvaluateVisibleState();
-			end
 		end
 	end
 

@@ -1,4 +1,4 @@
-## Interface: 120105
+## Interface: 120105, 50504, 40402, 38000, 20506, 11509
 ## Title: Flash Task Bar
 ## Notes: Flashes the taskbar when you are alt-tabbed and queue for raid finder, battleground pops up.
 ## SavedVariables: FlashTaskbarDB
